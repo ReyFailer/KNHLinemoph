@@ -1,0 +1,177 @@
+@component('layouts/app', { title: 'กลุ่ม LINE' })
+  @slot('main')
+    <div class="card-modern mb-4">
+      <div class="card-modern-header">
+        <h2><i class="bi bi-people text-brand"></i> กลุ่ม LINE <span class="text-muted-soft">({{ groups.length }})</span></h2>
+        <button class="btn-modern btn-brand" onclick="Groups.openNew()">
+          <i class="bi bi-plus-lg"></i> เพิ่มกลุ่ม
+        </button>
+      </div>
+      <div class="card-modern-body" style="padding:0;">
+        @if(groups.length === 0)
+          <div class="empty-state">
+            <i class="bi bi-people"></i>
+            <h4>ยังไม่มีกลุ่ม</h4>
+          </div>
+        @else
+          <div class="table-responsive">
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  <th>ชื่อกลุ่ม</th>
+                  <th>Client Key</th>
+                  <th>API URL</th>
+                  <th>สถานะ</th>
+                  <th class="text-end">การจัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                @each(g in groups)
+                  <tr data-group-id="{{ g.id }}">
+                    <td><strong>{{ g.name }}</strong></td>
+                    <td><small><code>{{ g.client_key_masked }}</code></small></td>
+                    <td><small class="text-muted-soft">{{ g.api_url }}</small></td>
+                    <td>
+                      @if(g.is_active)
+                        <span class="badge-modern badge-success">เปิด</span>
+                      @else
+                        <span class="badge-modern badge-neutral">ปิด</span>
+                      @end
+                    </td>
+                    <td class="text-end">
+                      <button class="btn-modern btn-ghost btn-sm btn-icon" onclick="Groups.test({{ g.id }})" title="ทดสอบส่ง">
+                        <i class="bi bi-send-check"></i>
+                      </button>
+                      <button class="btn-modern btn-soft btn-sm btn-icon" onclick="Groups.openEdit({{ g.id }})" title="แก้ไข">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" onclick="Groups.remove({{ g.id }})" title="ลบ">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                @end
+              </tbody>
+            </table>
+          </div>
+        @end
+      </div>
+    </div>
+
+    <div class="modal fade" id="groupModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <form id="groupForm" class="form-modern" novalidate>
+            <input type="hidden" name="id">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+            <div class="modal-header">
+              <h5 class="modal-title" id="groupModalTitle"><i class="bi bi-people text-brand"></i> เพิ่มกลุ่ม LINE</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label">ชื่อกลุ่ม *</label>
+                  <input type="text" class="form-control" name="group_name" required maxlength="100">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Client Key *</label>
+                  <input type="text" class="form-control" name="client_key" required>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Secret Key *</label>
+                  <input type="text" class="form-control" name="secret_key" required>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">API URL</label>
+                  <input type="url" class="form-control" name="api_url" value="{{ defaultApiUrl }}">
+                </div>
+                <div class="col-12">
+                  <label class="form-switch-modern">
+                    <input type="checkbox" name="is_active" value="1" checked>
+                    <span class="switch-track"></span>
+                    <span>เปิดใช้งาน</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button type="button" class="btn-modern btn-soft" data-bs-dismiss="modal">ยกเลิก</button>
+              <button type="submit" class="btn-modern btn-brand"><i class="bi bi-check-lg"></i> บันทึก</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  @end
+
+  @slot('scripts')
+    <script>
+      (function () {
+        const Groups = {
+          modal: null,
+          defaultApiUrl: {{{ JSON.stringify(defaultApiUrl) }}},
+          init() {
+            this.modal = new bootstrap.Modal(document.getElementById('groupModal'));
+            document.getElementById('groupForm').addEventListener('submit', e => {
+              e.preventDefault();
+              this.save();
+            });
+          },
+          openNew() {
+            const f = document.getElementById('groupForm');
+            f.reset();
+            f.id.value = '';
+            f.api_url.value = this.defaultApiUrl;
+            f.is_active.checked = true;
+            document.getElementById('groupModalTitle').textContent = 'เพิ่มกลุ่ม LINE';
+            this.modal.show();
+          },
+          async openEdit(id) {
+            const res = await App.ajax('/groups/get', { id });
+            if (!res.success) return;
+            const g = res.data;
+            const f = document.getElementById('groupForm');
+            f.id.value = g.id;
+            f.group_name.value = g.group_name;
+            f.client_key.value = g.client_key;
+            f.secret_key.value = g.secret_key;
+            f.api_url.value = g.api_url;
+            f.is_active.checked = !!g.is_active;
+            document.getElementById('groupModalTitle').textContent = 'แก้ไขกลุ่ม';
+            this.modal.show();
+          },
+          async save() {
+            const fd = new FormData(document.getElementById('groupForm'));
+            const res = await App.ajax('/groups/save', fd);
+            if (res.success) {
+              App.success('สำเร็จ', res.message);
+              this.modal.hide();
+              setTimeout(() => location.reload(), 500);
+            }
+          },
+          async remove(id) {
+            const ok = await App.confirm({ title: 'ลบกลุ่ม?', text: 'ไม่สามารถย้อนกลับได้', confirmText: 'ลบ', danger: true });
+            if (!ok) return;
+            const res = await App.ajax('/groups/delete', { id });
+            if (res.success) {
+              App.success('สำเร็จ', res.message);
+              document.querySelector(`tr[data-group-id="${id}"]`)?.remove();
+            }
+          },
+          async test(id) {
+            const ok = await App.confirm({ title: 'ทดสอบส่งข้อความ?', text: 'จะส่งข้อความทดสอบจริงไปยังกลุ่มนี้', confirmText: 'ส่งทดสอบ' });
+            if (!ok) return;
+            const res = await App.ajax('/groups/test', { id });
+            if (res.success) App.success('สำเร็จ', res.message);
+          },
+        };
+        window.Groups = Groups;
+        document.addEventListener('DOMContentLoaded', () => Groups.init());
+      })();
+    </script>
+  @end
+@end

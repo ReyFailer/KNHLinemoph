@@ -1,0 +1,51 @@
+{{--
+  Sidebar nav — port of the inline sidebar block from
+  public/index.php (legacy PHP project).
+
+  navConfig is shared from the share_view_globals middleware
+  so each page sees the same role-filtered nav.
+--}}
+@let(navItems = [
+  { key: 'dashboard', title: 'แดชบอร์ด',       icon: 'speedometer2',      group: 'main',   role: 'viewer'   },
+  { key: 'schedules', title: 'ตารางเวลา',       icon: 'calendar3',         group: 'main',   role: 'viewer'   },
+  { key: 'logs',      title: 'ประวัติการส่ง',    icon: 'clock-history',     group: 'main',   role: 'viewer'   },
+  { key: 'templates', title: 'เทมเพลตข้อความ',  icon: 'file-earmark-text', group: 'data',   role: 'viewer'   },
+  { key: 'items',     title: 'รายการข้อมูล',     icon: 'database',          group: 'data',   role: 'operator' },
+  { key: 'groups',    title: 'กลุ่ม LINE',        icon: 'people',            group: 'data',   role: 'admin'    },
+  { key: 'cron',      title: 'การทำงาน Cron',    icon: 'cpu',               group: 'system', role: 'operator' },
+  { key: 'audit',     title: 'ประวัติการแก้ไข', icon: 'shield-check',      group: 'system', role: 'admin'    },
+  { key: 'users',     title: 'ผู้ใช้งาน',          icon: 'person-gear',       group: 'system', role: 'viewer'   },
+  { key: 'settings',  title: 'ตั้งค่า',           icon: 'gear',              group: 'system', role: 'viewer'   },
+])
+@let(groupLabels = { main: 'หลัก', data: 'ข้อมูล', system: 'ระบบ' })
+@let(roleRank = { viewer: 1, operator: 2, admin: 3 })
+@let(myRank = roleRank[user?.role] ?? 0)
+
+<aside class="app-sidebar" aria-label="เมนูหลัก">
+  <div class="sidebar-brand">
+    <div class="brand-icon"><i class="bi bi-chat-dots-fill"></i></div>
+    <div class="brand-text">
+      <h1>{{ appName() }}</h1>
+      <small>โรงพยาบาลแก้งสนามนาง</small>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    @each(groupKey in Object.keys(groupLabels))
+      @let(groupVisible = navItems.filter(i => i.group === groupKey && myRank >= (roleRank[i.role] ?? 0) && !(i.key === 'users' && myRank < roleRank.admin)))
+      @if(groupVisible.length > 0)
+        <div class="sidebar-section">{{ groupLabels[groupKey] }}</div>
+        @each(item in groupVisible)
+          <a href="/{{ item.key }}" class="sidebar-link {{ currentPath === '/' + item.key ? 'is-active' : '' }}">
+            <i class="bi bi-{{ item.icon }}"></i>
+            <span>{{ item.title }}</span>
+          </a>
+        @end
+      @end
+    @end
+  </nav>
+
+  <div class="sidebar-footer">
+    <div>v{{ appVersion }} · FailerDev</div>
+  </div>
+</aside>

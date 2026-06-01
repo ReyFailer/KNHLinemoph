@@ -1,0 +1,113 @@
+@component('layouts/app', { title: 'ประวัติการแก้ไข' })
+  @slot('main')
+    @let(actionTone = {
+      create: 'success', update: 'info', delete: 'danger',
+      login: 'brand', login_failed: 'warning', logout: 'neutral',
+      export: 'info', resend: 'warning', test_send: 'info', cron_run: 'neutral',
+    })
+    @let(actionLabel = {
+      create: 'สร้าง', update: 'แก้ไข', delete: 'ลบ',
+      login: 'เข้าระบบ', login_failed: 'login fail', logout: 'ออกระบบ',
+      export: 'export', resend: 'ส่งซ้ำ', test_send: 'ทดสอบ', cron_run: 'cron',
+    })
+
+    <div class="card-modern mb-4">
+      <div class="card-modern-header">
+        <h2><i class="bi bi-funnel text-brand"></i> กรอง Audit Log</h2>
+        <span class="badge-modern badge-neutral">แสดง {{ logs.length }} รายการ</span>
+      </div>
+      <div class="card-modern-body form-modern">
+        <form method="get" action="/audit" class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">จากวันที่</label>
+            <input type="date" class="form-control" name="start_date" value="{{ filters.start }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">ถึงวันที่</label>
+            <input type="date" class="form-control" name="end_date" value="{{ filters.end }}">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Action</label>
+            <select name="action_filter" class="form-select">
+              <option value="">— ทั้งหมด —</option>
+              @each(a in Object.keys(actionLabel))
+                <option value="{{ a }}" {{ filters.action === a ? 'selected' : '' }}>{{ a }}</option>
+              @end
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Target</label>
+            <select name="target_filter" class="form-select">
+              <option value="">— ทั้งหมด —</option>
+              @each(t in ['schedule','template','item','group','user','his_database','settings','log','cron'])
+                <option value="{{ t }}" {{ filters.target === t ? 'selected' : '' }}>{{ t }}</option>
+              @end
+            </select>
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button type="submit" class="btn-modern btn-brand w-100"><i class="bi bi-search"></i> ค้นหา</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card-modern">
+      <div class="card-modern-header">
+        <h2><i class="bi bi-shield-check text-brand"></i> Audit Trail</h2>
+      </div>
+      <div class="card-modern-body" style="padding:0;">
+        @if(logs.length === 0)
+          <div class="empty-state">
+            <i class="bi bi-inbox"></i>
+            <h4>ไม่มีรายการ</h4>
+            <p>ไม่พบกิจกรรมในช่วงเวลาที่เลือก</p>
+          </div>
+        @else
+          <div class="table-responsive">
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  <th>เวลา</th>
+                  <th>ผู้ใช้</th>
+                  <th>Action</th>
+                  <th>Target</th>
+                  <th>รายละเอียด</th>
+                  <th>IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                @each(l in logs)
+                  @let(tone = actionTone[l.action] ?? 'neutral')
+                  @let(label = actionLabel[l.action] ?? l.action)
+                  <tr>
+                    <td>
+                      <div>{{ l.created_at.slice(5, 16) }}</div>
+                      <small class="text-muted-soft">{{ l.created_at.slice(0, 10) }}</small>
+                    </td>
+                    <td>
+                      @if(l.username)
+                        <strong>{{ l.username }}</strong>
+                      @else
+                        <span class="text-muted-soft">—</span>
+                      @end
+                    </td>
+                    <td><span class="badge-modern badge-{{ tone }}">{{ label }}</span></td>
+                    <td>
+                      @if(l.target_type)
+                        {{ l.target_type }}{{ l.target_id ? ' #' + l.target_id : '' }}
+                      @else
+                        <span class="text-muted-soft">—</span>
+                      @end
+                    </td>
+                    <td><span style="font-size:13px;">{{ l.description ?? '' }}</span></td>
+                    <td><small class="text-muted-soft">{{ l.ip_address ?? '' }}</small></td>
+                  </tr>
+                @end
+              </tbody>
+            </table>
+          </div>
+        @end
+      </div>
+    </div>
+  @end
+@end

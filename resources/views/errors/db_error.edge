@@ -1,0 +1,26 @@
+@component('layouts/auth', { title: 'เชื่อมต่อ DB ไม่ได้' })
+  @slot('main')
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+      <div style="text-align:center;max-width:520px;">
+        <h1 style="font-size:96px;margin:0;color:#dc2626;">503</h1>
+        <h2 style="margin:8px 0 16px;">ไม่สามารถเชื่อมต่อฐานข้อมูล</h2>
+        <p class="text-muted">โปรดตรวจสอบ MySQL/MariaDB ใน XAMPP แล้วลองใหม่</p>
+
+        @if(typeof error !== 'undefined' && error)
+          <details style="margin-top:16px;text-align:left;background:var(--bg-muted);padding:12px;border-radius:8px;">
+            <summary style="cursor:pointer;font-weight:600;">รายละเอียดข้อผิดพลาด</summary>
+            <pre style="margin-top:8px;font-size:12px;overflow-x:auto;">{{ error?.message ?? String(error) }}</pre>
+          </details>
+        @end
+
+        <ol style="text-align:left;margin-top:24px;line-height:1.8;">
+          <li>เปิด XAMPP Control Panel แล้ว Start MySQL</li>
+          <li>ตรวจสอบ <code>DB_*</code> ใน <code>.env</code></li>
+          <li>ยืนยันว่า DB <code>{{ env('DB_DATABASE', '?') }}</code> มีอยู่</li>
+        </ol>
+
+        <a href="/dashboard" class="btn btn-success mt-3" style="background:#06c755;border-color:#06c755;">ลองอีกครั้ง</a>
+      </div>
+    </div>
+  @end
+@end

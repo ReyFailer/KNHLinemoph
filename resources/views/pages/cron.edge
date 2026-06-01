@@ -1,0 +1,192 @@
+@component('layouts/app', { title: 'การทำงาน Cron' })
+  @slot('main')
+    <div class="stat-grid mb-4">
+      <div class="stat-card">
+        <p class="stat-label">สถานะ Scheduler</p>
+        <p class="stat-value" id="schedulerStatus">—</p>
+        <span class="stat-trend flat"><span id="lastTickAge">—</span></span>
+        <div class="stat-icon tone-brand"><i class="bi bi-cpu"></i></div>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">ส่งแล้ววันนี้</p>
+        <p class="stat-value" id="sentToday">0</p>
+        <span class="stat-trend up">สำเร็จ</span>
+        <div class="stat-icon tone-info"><i class="bi bi-send-check"></i></div>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">ล้มเหลววันนี้</p>
+        <p class="stat-value" id="failedToday">0</p>
+        <span class="stat-trend flat">errors</span>
+        <div class="stat-icon tone-danger"><i class="bi bi-x-circle"></i></div>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">ตารางเวลาที่ใช้งาน</p>
+        <p class="stat-value" id="activeSchedules">0</p>
+        <span class="stat-trend flat">active</span>
+        <div class="stat-icon tone-neutral"><i class="bi bi-calendar3"></i></div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-8">
+        <div class="card-modern">
+          <div class="card-modern-header">
+            <h2><i class="bi bi-terminal text-brand"></i> Cron Log</h2>
+            <div class="d-flex gap-2 align-items-center">
+              <input type="date" id="logDate" value="{{ today }}" class="form-control form-control-sm" style="width:auto;">
+              <select id="logType" class="form-select form-select-sm" style="width:auto;">
+                <option value="info">ทั้งหมด</option>
+                <option value="error">เฉพาะ errors</option>
+              </select>
+              <button class="btn-modern btn-soft btn-sm" onclick="CronView.loadLog()">
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
+              <button class="btn-modern btn-brand btn-sm" onclick="CronView.runNow()">
+                <i class="bi bi-play-circle"></i> รันเดี๋ยวนี้
+              </button>
+            </div>
+          </div>
+          <div class="card-modern-body" style="padding:0;">
+            <pre id="logViewer" style="margin:0;padding:16px;height:520px;overflow-y:auto;background:#0f172a;color:#e2e8f0;font-family:ui-monospace,monospace;font-size:12px;line-height:1.5;border-radius:0 0 var(--radius-lg) var(--radius-lg);">กำลังโหลด...</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card-modern mb-4">
+          <div class="card-modern-header"><h2><i class="bi bi-info-circle text-brand"></i> วิธีการทำงาน</h2></div>
+          <div class="card-modern-body">
+            <div style="padding:12px;background:var(--bg-muted);border-radius:10px;margin-bottom:12px;">
+              <strong><i class="bi bi-cpu text-brand"></i> In-process scheduler</strong>
+              <div class="text-muted-soft mt-1" style="font-size:13px;">
+                ทำงานในตัว <code>npm run dev</code>/<code>npm start</code> — tick ทุก 1 นาที (TZ=Asia/Bangkok)
+              </div>
+            </div>
+            <div style="padding:12px;background:var(--bg-muted);border-radius:10px;margin-bottom:12px;">
+              <strong><i class="bi bi-terminal text-brand"></i> CLI Command</strong>
+              <div class="text-muted-soft mt-1" style="font-size:13px;">รันด้วยมือหรือผ่าน OS scheduler:</div>
+              <code style="display:block;padding:6px 10px;background:var(--bg-elevated);border-radius:6px;margin-top:6px;font-size:12px;">npm run cron:run</code>
+              <code style="display:block;padding:6px 10px;background:var(--bg-elevated);border-radius:6px;margin-top:4px;font-size:12px;">node ace cron:run</code>
+            </div>
+            <div style="padding:12px;background:var(--bg-muted);border-radius:10px;">
+              <strong><i class="bi bi-link text-brand"></i> HTTP Token</strong>
+              <div class="text-muted-soft mt-1" style="font-size:13px;">เรียกจาก uptime monitor:</div>
+              <code style="display:block;padding:6px 10px;background:var(--bg-elevated);border-radius:6px;margin-top:6px;font-size:11px;word-break:break-all;">POST /cron/run?token={{ cronToken }}</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-modern">
+          <div class="card-modern-header"><h2><i class="bi bi-gear text-brand"></i> Auto-refresh</h2></div>
+          <div class="card-modern-body">
+            <label class="form-switch-modern">
+              <input type="checkbox" id="autoRefresh">
+              <span class="switch-track"></span>
+              <span>รีเฟรช log ทุก 5 วินาที</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  @end
+
+  @slot('scripts')
+    <script>
+      (function () {
+        const CronView = {
+          autoRefreshTimer: null,
+
+          async loadStatus() {
+            const res = await App.ajax('/cron/status', {}, { loader: false, autoToast: false });
+            if (!res.success) return;
+            const d = res.data;
+            document.getElementById('sentToday').textContent = d.sent_today ?? 0;
+            document.getElementById('failedToday').textContent = d.failed_today ?? 0;
+            document.getElementById('activeSchedules').textContent = d.active_schedules ?? 0;
+
+            const status = document.getElementById('schedulerStatus');
+            const age = document.getElementById('lastTickAge');
+            if (d.last_tick_age_sec == null) {
+              status.textContent = 'ไม่มีกิจกรรม';
+              age.textContent = 'ยังไม่เคยรัน';
+            } else if (d.last_tick_age_sec < 90) {
+              status.textContent = 'ทำงาน';
+              status.style.color = 'var(--success)';
+              age.textContent = `tick ล่าสุด ${d.last_tick_age_sec} วินาทีที่แล้ว`;
+            } else {
+              status.textContent = 'ไม่ตอบ';
+              status.style.color = 'var(--danger)';
+              age.textContent = `tick ล่าสุด ${Math.round(d.last_tick_age_sec / 60)} นาทีที่แล้ว`;
+            }
+          },
+
+          async loadLog() {
+            const date = document.getElementById('logDate').value;
+            const type = document.getElementById('logType').value;
+            const res = await App.ajax('/cron/log', { date, type, lines: 500 }, { loader: false, autoToast: false });
+            const viewer = document.getElementById('logViewer');
+            if (!res.success) { viewer.textContent = 'โหลดไม่ได้: ' + (res.message || '?'); return; }
+            const d = res.data;
+            if (!d.exists || d.lines.length === 0) {
+              viewer.textContent = `ไม่มี log สำหรับวันที่ ${date}`;
+              return;
+            }
+            viewer.innerHTML = d.lines.map(line => {
+              const color = /\[error\]/.test(line) ? '#ef4444'
+                : /\[warning\]/.test(line) ? '#f59e0b'
+                : /✓/.test(line) ? '#22c55e'
+                : /⚠|⏰|⏭/.test(line) ? '#fbbf24'
+                : /STEP \d/.test(line) ? '#60a5fa'
+                : '#e2e8f0';
+              return `<span style="color:${color};">${escapeHtml(line)}</span>`;
+            }).join('\n');
+            viewer.scrollTop = viewer.scrollHeight;
+          },
+
+          async runNow() {
+            const ok = await App.confirm({
+              title: 'รัน Cron ตอนนี้?',
+              text: 'ระบบจะตรวจหา schedule ที่ถึงเวลาส่งและส่งจริง',
+              confirmText: 'รัน',
+            });
+            if (!ok) return;
+            const res = await App.ajax('/cron/run', {});
+            if (res.success) {
+              App.success('สำเร็จ', res.message);
+              await this.loadLog();
+              await this.loadStatus();
+            }
+          },
+
+          toggleAutoRefresh() {
+            const on = document.getElementById('autoRefresh').checked;
+            if (on) {
+              this.autoRefreshTimer = setInterval(() => {
+                this.loadLog();
+                this.loadStatus();
+              }, 5000);
+            } else if (this.autoRefreshTimer) {
+              clearInterval(this.autoRefreshTimer);
+              this.autoRefreshTimer = null;
+            }
+          },
+
+          init() {
+            this.loadStatus();
+            this.loadLog();
+            document.getElementById('autoRefresh').addEventListener('change', () => this.toggleAutoRefresh());
+            document.getElementById('logDate').addEventListener('change', () => this.loadLog());
+            document.getElementById('logType').addEventListener('change', () => this.loadLog());
+          },
+        };
+
+        function escapeHtml(s) {
+          return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+        }
+
+        window.CronView = CronView;
+        document.addEventListener('DOMContentLoaded', () => CronView.init());
+      })();
+    </script>
+  @end
+@end

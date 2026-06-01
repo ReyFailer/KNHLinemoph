@@ -1,0 +1,470 @@
+@component('layouts/app', { title: 'ตั้งค่า' })
+  @slot('main')
+    <div class="settings-tabs">
+      <ul class="nav nav-tabs nav-modern" id="settingsTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-general" type="button"><i class="bi bi-info-circle"></i> ข้อมูลทั่วไป</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-database" type="button"><i class="bi bi-database"></i> ฐานข้อมูล</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-security" type="button"><i class="bi bi-shield-check"></i> ความปลอดภัย</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-help" type="button"><i class="bi bi-question-circle"></i> คู่มือ</button></li>
+      </ul>
+    </div>
+
+    <div class="tab-content mt-4">
+
+      {{-- General --}}
+      <div class="tab-pane fade show active" id="tab-general">
+        <div class="row g-4">
+          <div class="col-lg-7">
+            <div class="card-modern mb-4">
+              <div class="card-modern-header">
+                <h2><i class="bi bi-pencil-square text-brand"></i> ตั้งค่าหน้าตา</h2>
+                @if(!isAdmin)
+                  <span class="badge-modern badge-neutral"><i class="bi bi-eye"></i> ดูอย่างเดียว</span>
+                @end
+              </div>
+              <div class="card-modern-body form-modern">
+                <form id="siteSettingsForm">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <div class="mb-3">
+                    <label class="form-label">หัวข้อหลัก</label>
+                    <input type="text" class="form-control" name="site_title" value="{{ settings.site_title }}" maxlength="100" {{ isAdmin ? '' : 'readonly' }}>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">ชื่อหน่วยงาน</label>
+                    <input type="text" class="form-control" name="org_name" value="{{ settings.org_name }}" maxlength="200" {{ isAdmin ? '' : 'readonly' }}>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">ข้อความท้ายข้อความทดสอบ</label>
+                    <input type="text" class="form-control" name="site_footer" value="{{ settings.site_footer }}" maxlength="200" {{ isAdmin ? '' : 'readonly' }}>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">URL ค่าเริ่มต้นสำหรับกลุ่มใหม่ (LINE/MOPH API)</label>
+                    <input type="url" class="form-control" name="default_api_url" value="{{ settings.default_api_url }}" {{ isAdmin ? '' : 'readonly' }}>
+                  </div>
+                  @if(isAdmin)
+                    <button type="submit" class="btn-modern btn-brand">
+                      <i class="bi bi-check-lg"></i> บันทึก
+                    </button>
+                  @else
+                    <div class="alert alert-info mb-0" style="font-size:13px;">
+                      <i class="bi bi-shield-lock"></i> เฉพาะ admin เท่านั้นที่แก้ไขได้
+                    </div>
+                  @end
+                </form>
+              </div>
+            </div>
+
+            <div class="card-modern">
+              <div class="card-modern-header"><h2><i class="bi bi-info-circle text-brand"></i> ข้อมูลระบบ</h2></div>
+              <div class="card-modern-body" style="padding:0;">
+                <table class="table-modern" style="border-radius:0;">
+                  <tbody>
+                    <tr><td class="text-muted-soft" style="width:40%;">เวอร์ชัน</td><td><span class="badge-modern badge-brand">v{{ meta.version }}</span></td></tr>
+                    <tr><td class="text-muted-soft">โหมด</td>
+                      <td>
+                        <span class="badge-modern {{ meta.node_env === 'production' ? 'badge-success' : 'badge-warning' }}">
+                          {{ meta.node_env === 'production' ? 'PRODUCTION' : 'DEVELOPMENT (Debug)' }}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr><td class="text-muted-soft">เขตเวลา</td><td>{{ meta.timezone }}</td></tr>
+                    <tr><td class="text-muted-soft">วันที่/เวลา</td><td><span id="liveTime">{{ meta.now }}</span></td></tr>
+                    <tr><td class="text-muted-soft">Node.js</td><td>{{ meta.node_version }}</td></tr>
+                    <tr><td class="text-muted-soft">Framework</td><td>AdonisJS v6 · FailerDev</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-5">
+            <div class="card-modern">
+              <div class="card-modern-header"><h2><i class="bi bi-question-circle text-brand"></i> ตัวแปรในเทมเพลต</h2></div>
+              <div class="card-modern-body">
+                <p class="text-muted-soft mb-2" style="font-size:13px;">ตัวแปรพื้นฐานที่ใช้ได้ทันที:</p>
+                <div class="chip-list mb-3">
+                  <span class="chip tone-brand">&#123;date&#125;</span>
+                  <span class="chip tone-brand">&#123;time&#125;</span>
+                </div>
+                <p class="text-muted-soft" style="font-size:13px;">ตัวแปรอื่นๆ ตั้งจากหน้า <a href="/items">รายการข้อมูล</a></p>
+              </div>
+            </div>
+
+            <div class="card-modern mt-4">
+              <div class="card-modern-header"><h2><i class="bi bi-calendar3 text-brand"></i> โหมดตารางเวลา</h2></div>
+              <div class="card-modern-body">
+                <div class="d-flex gap-2 align-items-start mb-3">
+                  <span class="badge-modern badge-brand" style="flex-shrink:0;"><i class="bi bi-calendar-week"></i> ทุกสัปดาห์</span>
+                  <small class="text-muted-soft">ส่งตามวันในสัปดาห์ที่เลือก</small>
+                </div>
+                <div class="d-flex gap-2 align-items-start">
+                  <span class="badge-modern badge-info" style="flex-shrink:0;"><i class="bi bi-calendar-event"></i> วันเฉพาะ</span>
+                  <small class="text-muted-soft">ส่งเฉพาะวันที่ระบุ — เหมาะกับงานครั้งเดียว</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {{-- Database tab --}}
+      <div class="tab-pane fade" id="tab-database">
+        <div class="card-modern mb-4">
+          <div class="card-modern-header">
+            <h2><i class="bi bi-server text-brand"></i> APP Database</h2>
+            <span class="badge-modern {{ appDb.ok ? 'badge-success' : 'badge-danger' }}">
+              {{ appDb.ok ? 'เชื่อมต่อได้' : 'ผิดพลาด' }}
+            </span>
+          </div>
+          <div class="card-modern-body" style="padding:0;">
+            <table class="table-modern" style="border-radius:0;">
+              <tbody>
+                <tr><td class="text-muted-soft" style="width:25%;">Host</td><td><code>{{ appDb.host }}</code></td></tr>
+                <tr><td class="text-muted-soft">Database</td><td><code>{{ appDb.database }}</code></td></tr>
+                <tr><td class="text-muted-soft">User</td><td><code>{{ appDb.user }}</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-modern-body" style="border-top:1px solid var(--border-soft);">
+            <div class="alert alert-info mb-0" style="font-size:13px;">
+              <i class="bi bi-info-circle"></i> APP Database ตั้งค่าจากไฟล์ <code>.env</code> เท่านั้น (ไม่อยู่ในตาราง)
+            </div>
+          </div>
+        </div>
+
+        <div class="card-modern">
+          <div class="card-modern-header">
+            <h2><i class="bi bi-database-fill text-brand"></i> HIS Databases <span class="text-muted-soft">({{ hisDbs.length }})</span></h2>
+            @if(isAdmin)
+              <button class="btn-modern btn-brand" onclick="HisDB.openNew()">
+                <i class="bi bi-plus-lg"></i> เพิ่ม HIS
+              </button>
+            @end
+          </div>
+          <div class="card-modern-body" style="padding:0;">
+            @if(hisDbs.length === 0)
+              <div class="empty-state">
+                <i class="bi bi-database-add"></i>
+                <h4>ยังไม่มี HIS Database</h4>
+              </div>
+            @else
+              <div class="table-responsive">
+                <table class="table-modern">
+                  <thead>
+                    <tr><th>ชื่อ</th><th>Host</th><th>Database</th><th>User</th><th>สถานะ</th><th class="text-end">การจัดการ</th></tr>
+                  </thead>
+                  <tbody>
+                    @each(h in hisDbs)
+                      <tr data-his-id="{{ h.id }}">
+                        <td>
+                          <strong>{{ h.name }}</strong>
+                          @if(h.is_default)
+                            <span class="badge-modern badge-brand ms-1" title="default"><i class="bi bi-star-fill"></i> default</span>
+                          @end
+                          @if(h.description)
+                            <div class="text-muted-soft" style="font-size:12px;">{{ h.description }}</div>
+                          @end
+                        </td>
+                        <td><code style="font-size:12px;">{{ h.host }}{{ h.port !== 3306 ? ':' + h.port : '' }}</code></td>
+                        <td><code style="font-size:12px;">{{ h.database_name }}</code></td>
+                        <td><span style="font-size:12px;">{{ h.username }}</span></td>
+                        <td>
+                          @if(h.is_active)
+                            <span class="badge-modern badge-success">เปิด</span>
+                          @else
+                            <span class="badge-modern badge-neutral">ปิด</span>
+                          @end
+                        </td>
+                        <td class="text-end">
+                          @if(isAdmin)
+                            <button class="btn-modern btn-ghost btn-sm btn-icon" onclick="HisDB.test({{ h.id }})" title="ทดสอบ"><i class="bi bi-plug"></i></button>
+                            @if(!h.is_default)
+                              <button class="btn-modern btn-warning-soft btn-sm btn-icon" onclick="HisDB.setDefault({{ h.id }})" title="ตั้งเป็น default"><i class="bi bi-star"></i></button>
+                            @end
+                            <button class="btn-modern btn-soft btn-sm btn-icon" onclick='HisDB.openEdit({{{ JSON.stringify(h) }}})' title="แก้ไข"><i class="bi bi-pencil"></i></button>
+                            <button class="btn-modern btn-danger-soft btn-sm btn-icon" onclick="HisDB.remove({{ h.id }})" title="ลบ"><i class="bi bi-trash"></i></button>
+                          @end
+                        </td>
+                      </tr>
+                    @end
+                  </tbody>
+                </table>
+              </div>
+            @end
+          </div>
+          @if(!isAdmin)
+            <div class="card-modern-body" style="border-top:1px solid var(--border-soft);">
+              <div class="alert alert-info mb-0" style="font-size:13px;">
+                <i class="bi bi-shield-lock"></i> เฉพาะ admin จัดการ HIS ได้
+              </div>
+            </div>
+          @end
+        </div>
+      </div>
+
+      {{-- Security --}}
+      <div class="tab-pane fade" id="tab-security">
+        <div class="row g-4">
+          <div class="col-lg-7">
+            <div class="card-modern">
+              <div class="card-modern-header"><h2><i class="bi bi-shield-check text-brand"></i> สถานะความปลอดภัย</h2></div>
+              <div class="card-modern-body" style="padding:0;">
+                <table class="table-modern" style="border-radius:0;">
+                  <tbody>
+                    <tr><td class="text-muted-soft" style="width:50%;">โหมด Debug</td>
+                      <td>
+                        @if(security.debug)
+                          <span class="badge-modern badge-warning"><i class="bi bi-exclamation-triangle"></i> เปิดอยู่ (ไม่ควรใช้ production)</span>
+                        @else
+                          <span class="badge-modern badge-success"><i class="bi bi-check-circle"></i> ปิด</span>
+                        @end
+                      </td>
+                    </tr>
+                    <tr><td class="text-muted-soft">ไฟล์ .env</td>
+                      <td><span class="badge-modern badge-success"><i class="bi bi-check-circle"></i> ใช้งาน</span></td>
+                    </tr>
+                    <tr><td class="text-muted-soft">Cron Token</td>
+                      <td>
+                        @if(security.cronTokenWeak)
+                          <span class="badge-modern badge-warning"><i class="bi bi-exclamation-triangle"></i> ใช้ค่า default</span>
+                        @else
+                          <span class="badge-modern badge-success"><i class="bi bi-check-circle"></i> ตั้งค่าแล้ว</span>
+                        @end
+                      </td>
+                    </tr>
+                    <tr><td class="text-muted-soft">CSRF Protection</td><td><span class="badge-modern badge-success"><i class="bi bi-check-circle"></i> เปิด (Shield)</span></td></tr>
+                    <tr><td class="text-muted-soft">Prepared Statements</td><td><span class="badge-modern badge-success"><i class="bi bi-check-circle"></i> ใช้ (Lucid)</span></td></tr>
+                    <tr><td class="text-muted-soft">Session Cookie HttpOnly</td><td><span class="badge-modern badge-success"><i class="bi bi-check-circle"></i> เปิด</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-5">
+            <div class="card-modern">
+              <div class="card-modern-header"><h2><i class="bi bi-person-circle text-brand"></i> บัญชีของคุณ</h2></div>
+              <div class="card-modern-body">
+                <div class="mb-2"><strong>{{ user?.displayName ?? user?.username }}</strong></div>
+                <div class="text-muted-soft mb-2" style="font-size:13px;">
+                  Username: <code>{{ user?.username }}</code>
+                </div>
+                <div class="mb-3">
+                  Role: <span class="badge-modern badge-brand">{{ user?.role }}</span>
+                </div>
+                <a href="/users/profile" class="btn-modern btn-soft w-100" style="justify-content:center;">
+                  <i class="bi bi-key"></i> เปลี่ยนรหัสผ่าน
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {{-- Help --}}
+      <div class="tab-pane fade" id="tab-help">
+        <div class="card-modern">
+          <div class="card-modern-header"><h2><i class="bi bi-book text-brand"></i> คู่มือการใช้งาน</h2></div>
+          <div class="card-modern-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div style="padding:16px;background:var(--bg-muted);border-radius:12px;height:100%;">
+                  <h5><i class="bi bi-1-circle-fill text-brand"></i> เริ่มต้น</h5>
+                  <ol style="font-size:14px;padding-left:20px;">
+                    <li>เพิ่ม HIS Database ที่จะดึงข้อมูล (admin)</li>
+                    <li>เพิ่มกลุ่ม LINE ที่จะส่งข้อความ (admin)</li>
+                    <li>เพิ่มรายการข้อมูล (SQL query) (operator)</li>
+                    <li>เพิ่มเทมเพลตข้อความที่ใช้ตัวแปร</li>
+                    <li>สร้างตารางเวลา</li>
+                  </ol>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div style="padding:16px;background:var(--bg-muted);border-radius:12px;height:100%;">
+                  <h5><i class="bi bi-2-circle-fill text-brand"></i> Cron (Phase 6)</h5>
+                  <p style="font-size:14px;">In-process scheduler (node-cron) ทำงานในตัว server</p>
+                  <ul style="font-size:14px;padding-left:20px;">
+                    <li>CLI: <code>npm run cron:run</code></li>
+                    <li>Auto: เมื่อ <code>npm run dev</code> รันอยู่ scheduler tick ทุกนาที</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div style="padding:16px;background:var(--bg-muted);border-radius:12px;height:100%;">
+                  <h5><i class="bi bi-3-circle-fill text-brand"></i> สิทธิ์ผู้ใช้</h5>
+                  <ul style="font-size:14px;padding-left:20px;">
+                    <li><strong>admin</strong> — เต็มสิทธิ์ จัดการผู้ใช้/HIS DB/กลุ่ม LINE</li>
+                    <li><strong>operator</strong> — จัดการ schedule/template/item รัน cron</li>
+                    <li><strong>viewer</strong> — ดูอย่างเดียว</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div style="padding:16px;background:var(--bg-muted);border-radius:12px;height:100%;">
+                  <h5><i class="bi bi-4-circle-fill text-brand"></i> Health Check</h5>
+                  <p style="font-size:14px;">URL สำหรับ uptime monitor:</p>
+                  <code style="display:block;padding:8px;background:var(--bg-elevated);border-radius:6px;font-size:12px;">
+                    /health
+                  </code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    {{-- HIS modal --}}
+    @if(isAdmin)
+      <div class="modal fade" id="hisModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+          <div class="modal-content">
+            <form id="hisForm" class="form-modern">
+              <input type="hidden" name="id">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+              <div class="modal-header">
+                <h5 class="modal-title" id="hisModalTitle"><i class="bi bi-database text-brand"></i> เพิ่ม HIS Database</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+
+              <div class="modal-body">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label">ชื่อ (logical) *</label>
+                    <input type="text" class="form-control" name="name" required pattern="[a-zA-Z0-9_]+" placeholder="hos">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">คำอธิบาย</label>
+                    <input type="text" class="form-control" name="description">
+                  </div>
+                  <div class="col-md-9">
+                    <label class="form-label">Host *</label>
+                    <input type="text" class="form-control" name="host" required>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Port</label>
+                    <input type="number" class="form-control" name="port" value="3306">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Username *</label>
+                    <input type="text" class="form-control" name="username" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Password <span id="hisPwdHint" class="text-muted-soft" style="font-size:12px;">(จำเป็นสำหรับใหม่)</span></label>
+                    <input type="password" class="form-control" name="password" autocomplete="new-password">
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Database name *</label>
+                    <input type="text" class="form-control" name="database_name" required>
+                  </div>
+                  <div class="col-12">
+                    <div class="d-flex gap-4">
+                      <label class="form-switch-modern">
+                        <input type="checkbox" name="is_active" value="1" checked>
+                        <span class="switch-track"></span>
+                        <span>เปิดใช้งาน</span>
+                      </label>
+                      <label class="form-switch-modern">
+                        <input type="checkbox" name="is_default" value="1">
+                        <span class="switch-track"></span>
+                        <span>ตั้งเป็น default</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="modal-footer">
+                <button type="button" class="btn-modern btn-soft" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" class="btn-modern btn-brand"><i class="bi bi-check-lg"></i> บันทึก</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    @end
+  @end
+
+  @slot('scripts')
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        // Site settings save
+        document.getElementById('siteSettingsForm')?.addEventListener('submit', async e => {
+          e.preventDefault();
+          const fd = new FormData(e.target);
+          const res = await App.ajax('/settings/save', fd);
+          if (res.success) {
+            App.success('บันทึกแล้ว', res.message);
+            if ((res.data?.changed || []).length > 0) setTimeout(() => location.reload(), 600);
+          }
+        });
+
+        // Live clock
+        setInterval(() => {
+          const el = document.getElementById('liveTime');
+          if (!el) return;
+          const d = new Date();
+          const pad = n => String(n).padStart(2, '0');
+          el.textContent = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }, 1000);
+
+        // HIS DB management (admin)
+        const hisModalEl = document.getElementById('hisModal');
+        if (!hisModalEl) return;
+        const hisModal = new bootstrap.Modal(hisModalEl);
+        const HisDB = {
+          openNew() {
+            const f = document.getElementById('hisForm');
+            f.reset(); f.elements['id'].value = ''; f.port.value = '3306';
+            f.password.required = true;
+            document.getElementById('hisPwdHint').textContent = '(จำเป็นสำหรับใหม่)';
+            document.getElementById('hisModalTitle').innerHTML = '<i class="bi bi-database text-brand"></i> เพิ่ม HIS Database';
+            hisModal.show();
+          },
+          openEdit(d) {
+            const f = document.getElementById('hisForm');
+            f.elements['id'].value = d.id;
+            f.elements['name'].value = d.name;
+            f.host.value = d.host;
+            f.port.value = d.port || 3306;
+            f.username.value = d.username;
+            f.database_name.value = d.database_name;
+            f.description.value = d.description || '';
+            f.is_active.checked = !!d.is_active;
+            f.is_default.checked = !!d.is_default;
+            f.password.value = '';
+            f.password.required = false;
+            document.getElementById('hisPwdHint').textContent = '(เว้นว่างถ้าไม่เปลี่ยน)';
+            document.getElementById('hisModalTitle').innerHTML = '<i class="bi bi-pencil-square text-brand"></i> แก้ไข HIS';
+            hisModal.show();
+          },
+          async save() {
+            const fd = new FormData(document.getElementById('hisForm'));
+            const res = await App.ajax('/hisdb/save', fd);
+            if (res.success) { App.success('สำเร็จ', res.message); hisModal.hide(); setTimeout(() => location.reload(), 500); }
+          },
+          async test(id) {
+            const res = await App.ajax('/hisdb/test', { id });
+            if (res.success) App.success('เชื่อมต่อสำเร็จ', `${res.data?.server || '?'} · ${res.data?.tables_count || 0} tables`);
+          },
+          async setDefault(id) {
+            const ok = await App.confirm({ title: 'ตั้งเป็น default?', confirmText: 'ตั้ง' });
+            if (!ok) return;
+            const res = await App.ajax('/hisdb/setDefault', { id });
+            if (res.success) { App.success('สำเร็จ', res.message); setTimeout(() => location.reload(), 500); }
+          },
+          async remove(id) {
+            const ok = await App.confirm({ title: 'ลบ HIS?', confirmText: 'ลบ', danger: true });
+            if (!ok) return;
+            const res = await App.ajax('/hisdb/delete', { id });
+            if (res.success) { App.success('สำเร็จ', res.message); setTimeout(() => location.reload(), 400); }
+          },
+        };
+        window.HisDB = HisDB;
+        document.getElementById('hisForm')?.addEventListener('submit', e => { e.preventDefault(); HisDB.save(); });
+      });
+    </script>
+  @end
+@end

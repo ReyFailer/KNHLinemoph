@@ -1,0 +1,284 @@
+@component('layouts/app', { title: 'ตารางเวลา' })
+  @slot('main')
+    @let(dayShort = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'])
+    @let(dayLong = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'])
+
+    <div class="card-modern mb-4">
+      <div class="card-modern-header">
+        <h2><i class="bi bi-calendar3 text-brand"></i> ตารางเวลาทั้งหมด <span class="text-muted-soft">({{ schedules.length }})</span></h2>
+        <button class="btn-modern btn-brand" data-action="new-schedule">
+          <i class="bi bi-plus-lg"></i> เพิ่มตารางเวลา
+        </button>
+      </div>
+      <div class="card-modern-body" style="padding:0;">
+        @if(schedules.length === 0)
+          <div class="empty-state">
+            <i class="bi bi-calendar-plus"></i>
+            <h4>ยังไม่มีตารางเวลา</h4>
+            <p>เริ่มต้นด้วยการสร้างตารางเวลาส่งข้อความอัตโนมัติ</p>
+            <button class="btn-modern btn-brand" data-action="new-schedule">
+              <i class="bi bi-plus-lg"></i> สร้างตารางเวลาแรก
+            </button>
+          </div>
+        @else
+          <div class="table-responsive">
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  <th>ชื่อตาราง</th>
+                  <th>เทมเพลต</th>
+                  <th>เวลาส่ง</th>
+                  <th>วัน</th>
+                  <th>ส่งซ้ำ</th>
+                  <th>สถานะ</th>
+                  <th>ส่งล่าสุด</th>
+                  <th class="text-end">การจัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                @each(s in schedules)
+                  <tr data-schedule-id="{{ s.id }}">
+                    <td>
+                      <strong>{{ s.name }}</strong>
+                      @if(s.mode === 'specific')
+                        <span class="badge-modern badge-info ms-1" title="ส่งเฉพาะวันที่ระบุ"><i class="bi bi-calendar-event"></i> วันเฉพาะ</span>
+                      @end
+                    </td>
+                    <td>
+                      @if(s.template_name)
+                        {{ s.template_name }}
+                      @else
+                        <span class="text-muted-soft">—</span>
+                      @end
+                    </td>
+                    <td><span class="kbd">{{ s.send_time }}</span></td>
+                    <td>
+                      @if(s.mode === 'specific')
+                        @let(upcoming = s.specific_dates.filter(d => d >= today).slice(0, 3))
+                        @let(shown = upcoming.length > 0 ? upcoming : s.specific_dates.slice(-3).reverse())
+                        <div class="chip-list">
+                          @each(d in shown)
+                            <span class="chip {{ d === today ? 'tone-brand' : '' }}" title="{{ d }}">
+                              <i class="bi bi-calendar{{ d === today ? '-check' : '-event' }}"></i>
+                              {{ d.slice(8, 10) }}/{{ d.slice(5, 7) }}
+                            </span>
+                          @end
+                          @if(s.specific_dates.length > 3)
+                            <span class="chip" title="ทั้งหมด {{ s.specific_dates.length }} วัน">+{{ s.specific_dates.length - 3 }}</span>
+                          @end
+                        </div>
+                      @else
+                        <div class="chip-list">
+                          @each(d in s.days)
+                            <span class="chip {{ d === todayDow ? 'tone-brand' : '' }}">{{ dayShort[d - 1] }}</span>
+                          @end
+                        </div>
+                      @end
+                    </td>
+                    <td>
+                      @if(s.repeat_enabled)
+                        <span class="badge-modern badge-brand">ทุก {{ s.repeat_interval }} {{ s.repeat_unit }}</span>
+                      @else
+                        <span class="text-muted-soft">—</span>
+                      @end
+                    </td>
+                    <td>
+                      @if(s.is_active)
+                        <span class="badge-modern badge-success">เปิดใช้งาน</span>
+                      @else
+                        <span class="badge-modern badge-neutral">ปิด</span>
+                      @end
+                    </td>
+                    <td>
+                      <small class="text-muted-soft">{{ s.last_sent_date ?? '—' }}</small>
+                    </td>
+                    <td class="text-end">
+                      <button class="btn-modern btn-ghost btn-sm btn-icon" data-action="test-schedule" data-id="{{ s.id }}" title="ทดสอบ">
+                        <i class="bi bi-send-check"></i>
+                      </button>
+                      <button class="btn-modern btn-ghost btn-sm btn-icon" data-action="clone-schedule" data-id="{{ s.id }}" title="ทำสำเนา">
+                        <i class="bi bi-files"></i>
+                      </button>
+                      <button class="btn-modern btn-soft btn-sm btn-icon" data-action="edit-schedule" data-id="{{ s.id }}" title="แก้ไข">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" data-action="delete-schedule" data-id="{{ s.id }}" title="ลบ">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                @end
+              </tbody>
+            </table>
+          </div>
+        @end
+      </div>
+    </div>
+
+    <div class="modal fade" id="scheduleModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <form id="scheduleForm" class="form-modern" novalidate>
+            <input type="hidden" name="id">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+            <div class="modal-header">
+              <h5 class="modal-title" id="scheduleModalTitle"><i class="bi bi-calendar3 text-brand"></i> เพิ่มตารางเวลา</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+              <div class="row g-3">
+                <div class="col-md-8">
+                  <label class="form-label">ชื่อตารางเวลา *</label>
+                  <input type="text" class="form-control" name="schedule_name" required maxlength="100" placeholder="เช่น สรุปผู้ป่วยรายวัน">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">เวลาส่ง *</label>
+                  <input type="time" class="form-control" name="send_time" required value="08:00">
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label">เทมเพลตข้อความ *</label>
+                  <select class="form-select" name="template_id" required id="scheduleTemplateSelect">
+                    <option value="">— เลือกเทมเพลต —</option>
+                    @each(t in templates)
+                      <option value="{{ t.id }}">{{ t.name }}</option>
+                    @end
+                  </select>
+                  <div id="tplVarsInfo" class="mt-2" style="display:none;">
+                    <span class="text-muted-soft" style="font-size:12px;"><i class="bi bi-database"></i> ดึงข้อมูล: </span>
+                    <span id="tplVarsChips" class="chip-list d-inline-flex"></span>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label">
+                    <i class="bi bi-calendar-week text-brand"></i>
+                    วันที่ส่ง <span style="color: var(--danger);">*</span>
+                  </label>
+
+                  <div class="mode-toggle" data-mode-toggle>
+                    <input type="hidden" name="schedule_mode" value="weekly">
+                    <button type="button" class="mode-toggle-btn is-active" data-mode="weekly">
+                      <i class="bi bi-calendar-week"></i> ทุกสัปดาห์
+                    </button>
+                    <button type="button" class="mode-toggle-btn" data-mode="specific">
+                      <i class="bi bi-calendar-event"></i> วันที่เฉพาะ
+                    </button>
+                  </div>
+
+                  <div class="day-picker mt-2" data-day-picker data-mode-panel="weekly">
+                    <div class="day-picker-header">
+                      <span class="text-muted-soft" style="font-size:13px;">เลือกวันในสัปดาห์ที่ต้องการส่ง</span>
+                      <div class="day-presets">
+                        <button type="button" class="btn-modern btn-soft" data-day-preset="weekday">จันทร์-ศุกร์</button>
+                        <button type="button" class="btn-modern btn-soft" data-day-preset="weekend">เสาร์-อาทิตย์</button>
+                        <button type="button" class="btn-modern btn-soft" data-day-preset="all">ทุกวัน</button>
+                        <button type="button" class="btn-modern btn-ghost" data-day-preset="clear">ล้าง</button>
+                      </div>
+                    </div>
+                    <div class="day-chips-grid">
+                      @each(k in [1, 2, 3, 4, 5, 6, 7])
+                        @let(isWeekend = k === 1 || k === 7)
+                        <label class="day-chip {{ isWeekend ? 'is-weekend' : '' }}" title="{{ dayLong[k - 1] }}">
+                          <input type="checkbox" name="days_of_week[]" value="{{ k }}">
+                          <span class="day-chip-name">{{ dayLong[k - 1] }}</span>
+                          <span class="day-chip-check"><i class="bi bi-check-lg"></i></span>
+                        </label>
+                      @end
+                    </div>
+                    <div class="day-picker-summary is-empty" data-day-summary>
+                      <i class="bi bi-info-circle"></i>
+                      <span>ยังไม่ได้เลือกวัน</span>
+                    </div>
+                  </div>
+
+                  <div class="date-picker-modern mt-2" data-mode-panel="specific" style="display:none;">
+                    <div class="date-picker-input-row">
+                      <input type="date" class="form-control" id="specificDateInput" min="{{ today }}">
+                      <button type="button" class="btn-modern btn-soft" id="btnAddDate">
+                        <i class="bi bi-plus-lg"></i> เพิ่ม
+                      </button>
+                    </div>
+                    <div class="date-list" id="specificDatesList">
+                      <span class="text-muted-soft" style="font-size:13px;">ยังไม่ได้เลือกวันที่</span>
+                    </div>
+                    <div class="form-text">เลือกวันที่ที่ต้องการให้ส่งข้อความ — ระบบจะส่งเฉพาะในวันที่ระบุไว้เท่านั้น</div>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label">กลุ่ม LINE *</label>
+                  <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:8px;">
+                    @if(groups.length === 0)
+                      <div class="text-muted-soft" style="padding:8px;">ยังไม่มีกลุ่ม — <a href="/groups">เพิ่มกลุ่ม</a></div>
+                    @else
+                      @each(g in groups)
+                        <label class="d-flex align-items-center gap-2" style="padding:6px 8px;cursor:pointer;border-radius:6px;">
+                          <input type="checkbox" name="group_ids[]" value="{{ g.id }}">
+                          <span>{{ g.name }}</span>
+                        </label>
+                      @end
+                    @end
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <div class="d-flex gap-3 align-items-center" style="padding:12px 14px;background:var(--bg-muted);border-radius:10px;">
+                    <label class="form-switch-modern">
+                      <input type="checkbox" name="repeat_enabled" id="repeat_enabled" value="1">
+                      <span class="switch-track"></span>
+                      <span><strong>ส่งซ้ำในวันเดียวกัน</strong></span>
+                    </label>
+                    <span class="text-muted-soft" style="font-size:13px;">เช่น ส่งทุก 30 นาที จนถึงเวลา 17:00</span>
+                  </div>
+                </div>
+
+                <div class="col-12" id="repeatFields" style="display:none;">
+                  <div class="row g-3">
+                    <div class="col-md-4">
+                      <label class="form-label">ทุก ๆ</label>
+                      <input type="number" class="form-control" name="repeat_interval" value="30" min="1">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">หน่วย</label>
+                      <select class="form-select" name="repeat_unit">
+                        <option value="minutes">นาที</option>
+                        <option value="hours">ชั่วโมง</option>
+                      </select>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">ส่งจนถึง</label>
+                      <input type="time" class="form-control" name="repeat_end_time" value="17:00">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-switch-modern">
+                    <input type="checkbox" name="is_active" value="1" checked>
+                    <span class="switch-track"></span>
+                    <span>เปิดใช้งานทันที</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button type="button" class="btn-modern btn-soft" data-bs-dismiss="modal">ยกเลิก</button>
+              <button type="submit" class="btn-modern btn-brand">
+                <i class="bi bi-check-lg"></i> บันทึก
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  @end
+
+  @slot('scripts')
+    <script>window.__scheduleTemplates = {{{ JSON.stringify(templates) }}};</script>
+    <script src="/assets/js/schedules.js?v={{ appVersion }}"></script>
+  @end
+@end

@@ -1,0 +1,177 @@
+@component('layouts/app', { title: 'ผู้ใช้งาน' })
+  @slot('main')
+    @let(roleTone = { admin: 'danger', operator: 'warning', viewer: 'info' })
+
+    <div class="card-modern mb-4">
+      <div class="card-modern-header">
+        <h2><i class="bi bi-person-gear text-brand"></i> ผู้ใช้งาน <span class="text-muted-soft">({{ users.length }})</span></h2>
+        <button class="btn-modern btn-brand" onclick="Users.openNew()">
+          <i class="bi bi-plus-lg"></i> เพิ่มผู้ใช้
+        </button>
+      </div>
+      <div class="card-modern-body" style="padding:0;">
+        <div class="table-responsive">
+          <table class="table-modern">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>ชื่อแสดง</th>
+                <th>บทบาท</th>
+                <th>สถานะ</th>
+                <th>เข้าใช้ล่าสุด</th>
+                <th class="text-end">การจัดการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              @each(u in users)
+                <tr data-user-id="{{ u.id }}">
+                  <td><strong>{{ u.username }}</strong></td>
+                  <td>{{ u.display_name }}</td>
+                  <td><span class="badge-modern badge-{{ roleTone[u.role] ?? 'neutral' }}">{{ u.role }}</span></td>
+                  <td>
+                    @if(u.is_active)
+                      <span class="badge-modern badge-success">ใช้งาน</span>
+                    @else
+                      <span class="badge-modern badge-neutral">ปิด</span>
+                    @end
+                  </td>
+                  <td><small class="text-muted-soft">{{ u.last_login_at ?? '—' }}</small></td>
+                  <td class="text-end">
+                    <button class="btn-modern btn-soft btn-sm btn-icon" onclick="Users.openEdit({{ u.id }})" title="แก้ไข">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    @if(user?.id !== u.id)
+                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" onclick="Users.remove({{ u.id }})" title="ลบ">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    @end
+                  </td>
+                </tr>
+              @end
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <form id="userForm" class="form-modern" novalidate>
+            <input type="hidden" name="id">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+            <div class="modal-header">
+              <h5 class="modal-title" id="userModalTitle"><i class="bi bi-person-plus text-brand"></i> เพิ่มผู้ใช้</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Username *</label>
+                  <input type="text" class="form-control" name="username" required pattern="[a-zA-Z0-9_.\-]+" maxlength="60">
+                  <div class="form-text">a-z, 0-9, _ . -</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">ชื่อแสดง *</label>
+                  <input type="text" class="form-control" name="display_name" required maxlength="120">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">บทบาท *</label>
+                  <select class="form-select" name="role" required>
+                    <option value="viewer">viewer (ดูอย่างเดียว)</option>
+                    <option value="operator">operator (จัดการเนื้อหา + cron)</option>
+                    <option value="admin">admin (เต็มสิทธิ์)</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">
+                    รหัสผ่าน <span id="pwdHint" class="text-muted-soft" style="font-size:12px;">(จำเป็นสำหรับใหม่)</span>
+                  </label>
+                  <input type="password" class="form-control" name="password" minlength="6" autocomplete="new-password">
+                  <div class="form-text">เว้นว่างเมื่อแก้ไขเพื่อใช้รหัสเดิม</div>
+                </div>
+                <div class="col-12">
+                  <label class="form-switch-modern">
+                    <input type="checkbox" name="is_active" value="1" checked>
+                    <span class="switch-track"></span>
+                    <span>เปิดใช้งาน</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button type="button" class="btn-modern btn-soft" data-bs-dismiss="modal">ยกเลิก</button>
+              <button type="submit" class="btn-modern btn-brand"><i class="bi bi-check-lg"></i> บันทึก</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  @end
+
+  @slot('scripts')
+    <script>
+      (function () {
+        const Users = {
+          modal: null,
+          init() {
+            this.modal = new bootstrap.Modal(document.getElementById('userModal'));
+            document.getElementById('userForm').addEventListener('submit', e => {
+              e.preventDefault();
+              this.save();
+            });
+          },
+          openNew() {
+            const f = document.getElementById('userForm');
+            f.reset(); f.id.value = '';
+            f.role.value = 'viewer';
+            f.is_active.checked = true;
+            f.password.required = true;
+            document.getElementById('pwdHint').textContent = '(จำเป็นสำหรับใหม่)';
+            document.getElementById('userModalTitle').innerHTML = '<i class="bi bi-person-plus text-brand"></i> เพิ่มผู้ใช้';
+            this.modal.show();
+          },
+          async openEdit(id) {
+            const res = await App.ajax('/users/get', { id });
+            if (!res.success) return;
+            const u = res.data;
+            const f = document.getElementById('userForm');
+            f.id.value = u.id;
+            f.username.value = u.username;
+            f.display_name.value = u.display_name;
+            f.role.value = u.role;
+            f.is_active.checked = !!u.is_active;
+            f.password.value = '';
+            f.password.required = false;
+            document.getElementById('pwdHint').textContent = '(เว้นว่างถ้าไม่เปลี่ยน)';
+            document.getElementById('userModalTitle').innerHTML = '<i class="bi bi-person-gear text-brand"></i> แก้ไขผู้ใช้';
+            this.modal.show();
+          },
+          async save() {
+            const fd = new FormData(document.getElementById('userForm'));
+            const res = await App.ajax('/users/save', fd);
+            if (res.success) {
+              App.success('สำเร็จ', res.message);
+              this.modal.hide();
+              setTimeout(() => location.reload(), 500);
+            }
+          },
+          async remove(id) {
+            const ok = await App.confirm({ title: 'ลบผู้ใช้?', text: 'ไม่สามารถย้อนกลับได้', confirmText: 'ลบ', danger: true });
+            if (!ok) return;
+            const res = await App.ajax('/users/delete', { id });
+            if (res.success) {
+              App.success('สำเร็จ', res.message);
+              document.querySelector(`tr[data-user-id="${id}"]`)?.remove();
+            }
+          },
+        };
+        window.Users = Users;
+        document.addEventListener('DOMContentLoaded', () => Users.init());
+      })();
+    </script>
+  @end
+@end

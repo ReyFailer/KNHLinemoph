@@ -1,0 +1,274 @@
+@component('layouts/app', { title: 'เทมเพลตข้อความ' })
+  @slot('main')
+    <div class="card-modern mb-4">
+      <div class="card-modern-header">
+        <h2><i class="bi bi-file-earmark-text text-brand"></i> เทมเพลตข้อความ <span class="text-muted-soft">({{ templates.length }})</span></h2>
+        <button class="btn-modern btn-brand" onclick="Templates.openNew()">
+          <i class="bi bi-plus-lg"></i> เพิ่มเทมเพลต
+        </button>
+      </div>
+      <div class="card-modern-body" style="padding:0;">
+        @if(templates.length === 0)
+          <div class="empty-state">
+            <i class="bi bi-file-earmark-plus"></i>
+            <h4>ยังไม่มีเทมเพลต</h4>
+          </div>
+        @else
+          <div class="table-responsive">
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  <th>ชื่อ</th>
+                  <th>ตัวแปร</th>
+                  <th>ตัวอย่าง</th>
+                  <th>สถานะ</th>
+                  <th class="text-end">การจัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                @each(t in templates)
+                  <tr data-tpl-id="{{ t.id }}">
+                    <td><strong>{{ t.name }}</strong></td>
+                    <td>
+                      <div class="chip-list">
+                        @each(v in t.variables.slice(0, 6))
+                          <span class="chip">&#123;{{ v }}&#125;</span>
+                        @end
+                        @if(t.variables.length > 6)
+                          <span class="chip">+{{ t.variables.length - 6 }}</span>
+                        @end
+                      </div>
+                    </td>
+                    <td><small class="text-muted-soft" style="white-space:pre-wrap;">{{ t.content.slice(0, 60) }}{{ t.content.length > 60 ? '…' : '' }}</small></td>
+                    <td>
+                      @if(t.is_active)
+                        <span class="badge-modern badge-success">เปิด</span>
+                      @else
+                        <span class="badge-modern badge-neutral">ปิด</span>
+                      @end
+                    </td>
+                    <td class="text-end">
+                      <button class="btn-modern btn-soft btn-sm btn-icon" onclick='Templates.openEdit({{{ JSON.stringify(t) }}})' title="แก้ไข">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" onclick="Templates.remove({{ t.id }})" title="ลบ">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                @end
+              </tbody>
+            </table>
+          </div>
+        @end
+      </div>
+    </div>
+
+    <div class="modal fade" id="templateModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <form id="templateForm" class="form-modern" novalidate>
+            <input type="hidden" name="id">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+            <div class="modal-header">
+              <h5 class="modal-title" id="templateModalTitle"><i class="bi bi-file-earmark-text text-brand"></i> เพิ่มเทมเพลต</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">ชื่อเทมเพลต *</label>
+                <input type="text" class="form-control" name="template_name" required maxlength="100">
+              </div>
+
+              <div class="row g-3">
+                <div class="col-md-7">
+                  <label class="form-label">เนื้อหา *</label>
+                  <textarea class="form-control" name="template_content" rows="10" required
+                            oninput="Templates.updatePreview()" id="templateContent"></textarea>
+
+                  <div class="placeholder-ref mt-2">
+                    <div class="placeholder-ref-header" onclick="this.parentElement.classList.toggle('is-open')">
+                      <i class="bi bi-braces"></i> ตัวแปรที่ใช้ได้
+                      <i class="bi bi-chevron-down placeholder-ref-chevron"></i>
+                    </div>
+                    <div class="placeholder-ref-body">
+                      <div class="placeholder-ref-group">
+                        <span class="placeholder-ref-label">วันที่ / เวลา</span>
+                        <div class="chip-list">
+                          <span class="chip chip-insert" data-insert="date" title="วันที่ปัจจุบัน เช่น 2026-06-01">&#123;date&#125;</span>
+                          <span class="chip chip-insert" data-insert="time" title="เวลาปัจจุบัน เช่น 08:30:00">&#123;time&#125;</span>
+                          <span class="chip chip-insert" data-insert="date_th" title="วันที่ภาษาไทย เช่น 1 มิถุนายน 2569">&#123;date_th&#125;</span>
+                          <span class="chip chip-insert" data-insert="weekday" title="วันในสัปดาห์ เช่น วันจันทร์">&#123;weekday&#125;</span>
+                        </div>
+                      </div>
+                      <div class="placeholder-ref-group">
+                        <span class="placeholder-ref-label">ข้อมูลระบบ</span>
+                        <div class="chip-list">
+                          <span class="chip chip-insert" data-insert="org_name" title="ชื่อโรงพยาบาล (Settings)">&#123;org_name&#125;</span>
+                          <span class="chip chip-insert" data-insert="site_title" title="ชื่อระบบ (Settings)">&#123;site_title&#125;</span>
+                          <span class="chip chip-insert" data-insert="site_footer" title="Footer (Settings)">&#123;site_footer&#125;</span>
+                        </div>
+                      </div>
+                      @if(itemVars.length > 0)
+                        <div class="placeholder-ref-group">
+                          <span class="placeholder-ref-label">รายการข้อมูล (Items)</span>
+                          <div class="chip-list">
+                            @each(iv in itemVars)
+                              <span class="chip chip-insert" data-insert="{{ iv.key }}" title="{{ iv.name }}">&#123;{{ iv.key }}&#125;</span>
+                            @end
+                          </div>
+                        </div>
+                      @else
+                        <div class="placeholder-ref-group">
+                          <span class="placeholder-ref-label">รายการข้อมูล (Items)</span>
+                          <span class="text-muted-soft" style="font-size:12px;">ยังไม่มี items ที่เปิดใช้งาน — <a href="/items">เพิ่มที่นี่</a></span>
+                        </div>
+                      @end
+                      <div class="form-text mt-1" style="font-size:11px;">คลิกที่ตัวแปรเพื่อแทรกลงในเนื้อหา</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-5">
+                  <label class="form-label">ตัวอย่าง</label>
+                  <pre id="templatePreview" style="background:var(--bg-muted);padding:12px;border-radius:8px;min-height:200px;white-space:pre-wrap;font-family:Sarabun,sans-serif;font-size:14px;"></pre>
+                  <div id="varStatus" class="form-text"></div>
+                </div>
+              </div>
+
+              <div class="mt-3">
+                <label class="form-switch-modern">
+                  <input type="checkbox" name="is_active" value="1" checked>
+                  <span class="switch-track"></span>
+                  <span>เปิดใช้งาน</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button type="button" class="btn-modern btn-soft" data-bs-dismiss="modal">ยกเลิก</button>
+              <button type="submit" class="btn-modern btn-brand"><i class="bi bi-check-lg"></i> บันทึก</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  @end
+
+  @slot('scripts')
+    <style>
+      .placeholder-ref { border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+      .placeholder-ref-header { display: flex; align-items: center; gap: 6px; padding: 7px 12px; cursor: pointer; color: var(--text-muted); user-select: none; }
+      .placeholder-ref-header:hover { color: var(--text); }
+      .placeholder-ref-chevron { margin-left: auto; transition: transform .2s; }
+      .placeholder-ref.is-open .placeholder-ref-chevron { transform: rotate(180deg); }
+      .placeholder-ref-body { display: none; padding: 10px 12px; border-top: 1px solid var(--border); }
+      .placeholder-ref.is-open .placeholder-ref-body { display: block; }
+      .placeholder-ref-group { margin-bottom: 8px; }
+      .placeholder-ref-group:last-child { margin-bottom: 0; }
+      .placeholder-ref-label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+      .chip-insert { cursor: pointer; transition: background .15s; }
+      .chip-insert:hover { background: var(--brand); color: #fff; }
+    </style>
+    <script>
+      (function () {
+        const knownVars = {{{ JSON.stringify(knownVars) }}};
+        const now = new Date();
+        const thMonths = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+        const thDays   = ['วันอาทิตย์','วันจันทร์','วันอังคาร','วันพุธ','วันพฤหัสบดี','วันศุกร์','วันเสาร์'];
+        const sampleVals = {
+          date:        now.toISOString().slice(0, 10),
+          time:        now.toTimeString().slice(0, 8),
+          date_th:     `${now.getDate()} ${thMonths[now.getMonth()]} ${now.getFullYear() + 543}`,
+          weekday:     thDays[now.getDay()],
+          org_name:    'โรงพยาบาลตัวอย่าง',
+          site_title:  'KNH MOPH Notify System',
+          site_footer: '🏥 จาก: โรงพยาบาลตัวอย่าง',
+        };
+        knownVars.forEach(k => { if (!(k in sampleVals)) sampleVals[k] = '123'; });
+
+        const Templates = {
+          modal: null,
+          init() {
+            this.modal = new bootstrap.Modal(document.getElementById('templateModal'));
+            document.getElementById('templateForm').addEventListener('submit', e => {
+              e.preventDefault();
+              this.save();
+            });
+            document.getElementById('templateModal').addEventListener('click', e => {
+              const chip = e.target.closest('.chip-insert');
+              if (!chip) return;
+              const ta = document.getElementById('templateContent');
+              const ins = `{${chip.dataset.insert}}`;
+              const s = ta.selectionStart, en = ta.selectionEnd;
+              ta.value = ta.value.slice(0, s) + ins + ta.value.slice(en);
+              ta.selectionStart = ta.selectionEnd = s + ins.length;
+              ta.focus();
+              this.updatePreview();
+            });
+          },
+          updatePreview() {
+            const content = document.getElementById('templateContent').value;
+            let preview = content;
+            const used = new Set();
+            const unknownInContent = [];
+            preview = preview.replace(/\{([a-zA-Z0-9_]+)\}/g, (m, k) => {
+              used.add(k);
+              if (!knownVars.includes(k)) unknownInContent.push(k);
+              return k in sampleVals ? String(sampleVals[k]) : m;
+            });
+            document.getElementById('templatePreview').textContent = preview;
+            const status = document.getElementById('varStatus');
+            if (used.size === 0) {
+              status.innerHTML = '<span class="text-muted-soft">ยังไม่ใช้ตัวแปรใด ๆ</span>';
+            } else if (unknownInContent.length > 0) {
+              status.innerHTML = '<span style="color:var(--danger);">⚠ ตัวแปรที่ไม่รู้จัก: {' + unknownInContent.join('}, {') + '}</span>';
+            } else {
+              status.innerHTML = '<span style="color:var(--success);">✓ ตัวแปรทั้งหมดถูกต้อง (' + used.size + ' ตัว)</span>';
+            }
+          },
+          openNew() {
+            const f = document.getElementById('templateForm');
+            f.reset();
+            f.id.value = '';
+            f.is_active.checked = true;
+            document.getElementById('templateModalTitle').textContent = 'เพิ่มเทมเพลต';
+            this.updatePreview();
+            this.modal.show();
+          },
+          openEdit(t) {
+            const f = document.getElementById('templateForm');
+            f.id.value = t.id;
+            f.template_name.value = t.name;
+            f.template_content.value = t.content;
+            f.is_active.checked = !!t.is_active;
+            document.getElementById('templateModalTitle').textContent = 'แก้ไขเทมเพลต';
+            this.updatePreview();
+            this.modal.show();
+          },
+          async save() {
+            const fd = new FormData(document.getElementById('templateForm'));
+            const res = await App.ajax('/templates/save', fd);
+            if (res.success) {
+              App.success('สำเร็จ', res.message);
+              this.modal.hide();
+              setTimeout(() => location.reload(), 500);
+            }
+          },
+          async remove(id) {
+            const ok = await App.confirm({ title: 'ลบเทมเพลต?', text: 'ไม่สามารถย้อนกลับได้', confirmText: 'ลบ', danger: true });
+            if (!ok) return;
+            const res = await App.ajax('/templates/delete', { id });
+            if (res.success) {
+              App.success('สำเร็จ', res.message);
+              document.querySelector(`tr[data-tpl-id="${id}"]`)?.remove();
+            }
+          },
+        };
+        window.Templates = Templates;
+        document.addEventListener('DOMContentLoaded', () => Templates.init());
+      })();
+    </script>
+  @end
+@end

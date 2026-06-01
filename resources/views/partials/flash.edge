@@ -1,0 +1,13 @@
+{{-- Server-set flash messages — picked up by app.js bootFlashMessages() --}}
+@if(flash?.success)
+  <span hidden data-flash="success">{{ flash.success }}</span>
+@end
+@if(flash?.warning)
+  <span hidden data-flash="warning">{{ flash.warning }}</span>
+@end
+@if(flash?.error)
+  <span hidden data-flash="error">{{ flash.error }}</span>
+@end
+@if(flash?.info)
+  <span hidden data-flash="info">{{ flash.info }}</span>
+@end

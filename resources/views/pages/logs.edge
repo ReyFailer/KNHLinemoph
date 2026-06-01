@@ -1,0 +1,179 @@
+@component('layouts/app', { title: 'ประวัติการส่ง' })
+  @slot('main')
+    <div class="stat-grid mb-4">
+      <div class="stat-card">
+        <p class="stat-label">การส่งทั้งหมด</p>
+        <p class="stat-value">{{ stats.total }}</p>
+        <span class="stat-trend flat"><i class="bi bi-calendar"></i> {{ filters.start }} → {{ filters.end }}</span>
+        <div class="stat-icon tone-info"><i class="bi bi-send"></i></div>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">สำเร็จ</p>
+        <p class="stat-value text-brand">{{ stats.success }}</p>
+        <span class="stat-trend up">{{ stats.total > 0 ? ((stats.success * 100) / stats.total).toFixed(1) : 0 }}%</span>
+        <div class="stat-icon tone-brand"><i class="bi bi-check2-circle"></i></div>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">ล้มเหลว</p>
+        <p class="stat-value" style="color:var(--danger);">{{ stats.failed }}</p>
+        <span class="stat-trend {{ stats.failed > 0 ? 'down' : 'flat' }}">{{ stats.total > 0 ? ((stats.failed * 100) / stats.total).toFixed(1) : 0 }}%</span>
+        <div class="stat-icon tone-danger"><i class="bi bi-x-circle"></i></div>
+      </div>
+    </div>
+
+    <div class="card-modern mb-4">
+      <div class="card-modern-header">
+        <h2><i class="bi bi-funnel text-brand"></i> กรองข้อมูล</h2>
+        <div class="d-flex gap-2">
+          <button class="btn-modern btn-soft btn-sm" onclick="Logs.exportCSV('{{ filters.start }}', '{{ filters.end }}')">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+          </button>
+          <button class="btn-modern btn-danger-soft btn-sm" onclick="Logs.clearOld()">
+            <i class="bi bi-trash"></i> ล้างประวัติเก่า
+          </button>
+        </div>
+      </div>
+      <div class="card-modern-body form-modern">
+        <form method="get" action="/logs" class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">จากวันที่</label>
+            <input type="date" class="form-control" name="start_date" value="{{ filters.start }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">ถึงวันที่</label>
+            <input type="date" class="form-control" name="end_date" value="{{ filters.end }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">ตารางเวลา</label>
+            <select class="form-select" name="schedule_id">
+              <option value="">— ทั้งหมด —</option>
+              @each(s in schedules)
+                <option value="{{ s.id }}" {{ filters.schedule_id === String(s.id) ? 'selected' : '' }}>
+                  {{ s.name }}{{ s.mode === 'specific' ? ' · 📅 วันเฉพาะ' : '' }}
+                </option>
+              @end
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">สถานะ</label>
+            <select class="form-select" name="status">
+              <option value="">— ทั้งหมด —</option>
+              <option value="200" {{ filters.status === '200' ? 'selected' : '' }}>สำเร็จ</option>
+              <option value="0" {{ filters.status === '0' ? 'selected' : '' }}>ผิดพลาด</option>
+            </select>
+          </div>
+          <div class="col-md-1 d-flex align-items-end">
+            <button type="submit" class="btn-modern btn-brand w-100"><i class="bi bi-search"></i></button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card-modern">
+      <div class="card-modern-header">
+        <h2><i class="bi bi-clock-history text-brand"></i> ประวัติการส่ง</h2>
+      </div>
+      <div class="card-modern-body" style="padding:0;">
+        @if(logs.length === 0)
+          <div class="empty-state">
+            <i class="bi bi-inbox"></i>
+            <h4>ไม่พบประวัติ</h4>
+            <p>ไม่มีประวัติการส่งในช่วงเวลาที่เลือก</p>
+          </div>
+        @else
+          <div class="table-responsive">
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  <th>เวลา</th>
+                  <th>ตารางเวลา</th>
+                  <th>กลุ่ม</th>
+                  <th>เทมเพลต</th>
+                  <th>สถานะ</th>
+                  <th class="text-end">ข้อความ</th>
+                </tr>
+              </thead>
+              <tbody>
+                @each(log in logs)
+                  <tr>
+                    <td>
+                      <div>{{ String(log.sent_at).slice(0, 10) }}</div>
+                      <small class="text-muted-soft">{{ String(log.sent_at).slice(11, 19) }}</small>
+                    </td>
+                    <td>{{ log.schedule_name ?? 'Manual' }}</td>
+                    <td>{{ log.group_name ?? '—' }}</td>
+                    <td>{{ log.template_name ?? '—' }}</td>
+                    <td>
+                      @if(Number(log.status_code) === 200)
+                        <span class="badge-modern badge-success"><i class="bi bi-check-circle"></i> สำเร็จ</span>
+                      @else
+                        <span class="badge-modern badge-danger">{{ log.status_code ?? 'ERR' }}</span>
+                      @end
+                    </td>
+                    <td class="text-end">
+                      <button class="btn-modern btn-ghost btn-sm btn-icon" onclick='Logs.view({{{ JSON.stringify({ message: log.message_content, response: log.response_text }) }}})' title="ดู">
+                        <i class="bi bi-eye"></i>
+                      </button>
+                      @if(Number(log.status_code) !== 200 && log.group_id)
+                        <button class="btn-modern btn-warning-soft btn-sm btn-icon" onclick="Logs.resend({{ log.id }})" title="ส่งซ้ำ">
+                          <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                      @end
+                    </td>
+                  </tr>
+                @end
+              </tbody>
+            </table>
+          </div>
+        @end
+      </div>
+    </div>
+  @end
+
+  @slot('scripts')
+    <script>
+      window.Logs = {
+        view(d) {
+          const text = (d.message || '') + '\n\n--- API Response ---\n' + (d.response || '');
+          document.getElementById('outputModalTitle').innerHTML = '<i class="bi bi-chat-text"></i> รายละเอียดการส่ง';
+          document.getElementById('outputModalContent').textContent = text.trim();
+          new bootstrap.Modal(document.getElementById('outputModal')).show();
+        },
+        async clearOld() {
+          const before = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+          const ok = await App.confirm({
+            title: 'ล้างประวัติเก่า?', text: `จะลบข้อมูลก่อนวันที่ ${before}`,
+            confirmText: 'ล้าง', danger: true,
+          });
+          if (!ok) return;
+          const res = await App.ajax('/logs/clear', { before_date: before });
+          if (res.success) { App.success('สำเร็จ', res.message); setTimeout(() => location.reload(), 500); }
+        },
+        exportCSV(start, end) {
+          const form = document.createElement('form');
+          form.method = 'POST'; form.action = '/logs/export'; form.style.display = 'none';
+          const csrfInput = document.createElement('input');
+          csrfInput.type = 'hidden'; csrfInput.name = '_csrf'; csrfInput.value = App.csrf;
+          form.appendChild(csrfInput);
+          ['start_date', 'end_date'].forEach((k, i) => {
+            const v = document.createElement('input');
+            v.type = 'hidden'; v.name = k; v.value = i === 0 ? start : end;
+            form.appendChild(v);
+          });
+          document.body.appendChild(form);
+          form.submit();
+          document.body.removeChild(form);
+        },
+        async resend(id) {
+          const ok = await App.confirm({ title: 'ส่งซ้ำ?', text: 'จะส่งข้อความเดิมไปยังกลุ่มเดิมอีกครั้ง', confirmText: 'ส่งซ้ำ' });
+          if (!ok) return;
+          const res = await App.ajax('/logs/resend', { id });
+          if (res.success) {
+            App.success('สำเร็จ', res.message);
+            setTimeout(() => location.reload(), 800);
+          }
+        },
+      };
+    </script>
+  @end
+@end

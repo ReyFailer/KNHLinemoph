@@ -1,0 +1,64 @@
+{{--
+  Topbar — page title + quick actions. Port of public/index.php
+  topbar block. Quick actions visible when user has operator+ role.
+--}}
+@let(roleRank = { viewer: 1, operator: 2, admin: 3 })
+@let(myRank = roleRank[user?.role] ?? 0)
+
+<header class="app-topbar">
+  <button type="button" class="topbar-toggle icon-btn" data-sidebar-toggle aria-label="เปิดเมนู">
+    <i class="bi bi-list" style="font-size:20px;"></i>
+  </button>
+
+  <div class="page-title">
+    <h1>{{ title ?? '' }}</h1>
+    <div class="page-crumb">
+      <a href="/dashboard" class="text-muted-soft">หน้าแรก</a>
+      <span class="mx-1">/</span>
+      <span>{{ title ?? '' }}</span>
+    </div>
+  </div>
+
+  <div class="topbar-actions">
+    @if(myRank >= roleRank.operator)
+      <button type="button" class="btn-modern btn-soft btn-sm" onclick="App.runCron()">
+        <i class="bi bi-play-circle"></i>
+        <span class="d-none d-md-inline">รัน Cron</span>
+      </button>
+      <button type="button" class="btn-modern btn-brand btn-sm" onclick="App.openTestSend()">
+        <i class="bi bi-send"></i>
+        <span class="d-none d-md-inline">ส่งทดสอบ</span>
+      </button>
+    @end
+
+    <button type="button" class="icon-btn" data-theme-toggle aria-label="สลับโหมด">
+      <i class="bi bi-moon"></i>
+    </button>
+
+    @if(user)
+      <div class="dropdown">
+        <button type="button" class="btn-modern btn-soft btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-person-circle"></i>
+          <span class="d-none d-md-inline">{{ user.displayName || user.username }}</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li>
+            <span class="dropdown-item-text" style="font-size:12px;color:var(--text-muted);">
+              <strong>{{ user.username }}</strong> · {{ user.role }}
+            </span>
+          </li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item" href="/users/profile"><i class="bi bi-person"></i> โปรไฟล์</a></li>
+          <li>
+            <form method="POST" action="/logout" style="margin:0;">
+              <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+              <button type="submit" class="dropdown-item" style="background:transparent;border:none;width:100%;text-align:left;">
+                <i class="bi bi-box-arrow-right"></i> ออกจากระบบ
+              </button>
+            </form>
+          </li>
+        </ul>
+      </div>
+    @end
+  </div>
+</header>

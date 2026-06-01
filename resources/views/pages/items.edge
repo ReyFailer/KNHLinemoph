@@ -1,0 +1,194 @@
+@component('layouts/app', { title: 'รายการข้อมูล' })
+  @slot('main')
+    <div class="card-modern mb-4">
+      <div class="card-modern-header">
+        <h2><i class="bi bi-database text-brand"></i> รายการข้อมูล (SQL items) <span class="text-muted-soft">({{ items.length }})</span></h2>
+        <button class="btn-modern btn-brand" onclick="Items.openNew()">
+          <i class="bi bi-plus-lg"></i> เพิ่มรายการ
+        </button>
+      </div>
+      <div class="card-modern-body" style="padding:0;">
+        @if(items.length === 0)
+          <div class="empty-state">
+            <i class="bi bi-database"></i>
+            <h4>ยังไม่มีรายการข้อมูล</h4>
+          </div>
+        @else
+          <div class="table-responsive">
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  <th>ชื่อ</th>
+                  <th>Key</th>
+                  <th>Database</th>
+                  <th>รายละเอียด</th>
+                  <th>สถานะ</th>
+                  <th class="text-end">การจัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                @each(i in items)
+                  <tr data-item-id="{{ i.id }}">
+                    <td><strong>{{ i.name }}</strong></td>
+                    <td><span class="kbd">&#123;{{ i.key }}&#125;</span></td>
+                    <td>
+                      @if(i.his === '__app__')
+                        <span class="badge-modern badge-info" title="ฐานข้อมูลโปรเจ็ค"><i class="bi bi-server"></i> โปรเจ็ค</span>
+                      @else
+                        <small>{{ i.his || 'hos' }}</small>
+                      @end
+                    </td>
+                    <td><small class="text-muted-soft">{{ i.description ?? '—' }}</small></td>
+                    <td>
+                      @if(i.is_active)
+                        <span class="badge-modern badge-success">เปิด</span>
+                      @else
+                        <span class="badge-modern badge-neutral">ปิด</span>
+                      @end
+                    </td>
+                    <td class="text-end">
+                      <button class="btn-modern btn-ghost btn-sm btn-icon" onclick="Items.test({{ i.id }})" title="ทดสอบ">
+                        <i class="bi bi-play-circle"></i>
+                      </button>
+                      <button class="btn-modern btn-soft btn-sm btn-icon" onclick='Items.openEdit({{{ JSON.stringify(i) }}})' title="แก้ไข">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" onclick="Items.remove({{ i.id }})" title="ลบ">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                @end
+              </tbody>
+            </table>
+          </div>
+        @end
+      </div>
+    </div>
+
+    <div class="modal fade" id="itemModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <form id="itemForm" class="form-modern" novalidate>
+            <input type="hidden" name="id">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+            <div class="modal-header">
+              <h5 class="modal-title" id="itemModalTitle"><i class="bi bi-database text-brand"></i> เพิ่มรายการ</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">ชื่อรายการ *</label>
+                  <input type="text" class="form-control" name="item_name" required maxlength="100">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Key *</label>
+                  <input type="text" class="form-control" name="item_key" required pattern="[a-zA-Z0-9_]+" maxlength="50">
+                  <div class="form-text">a-z, A-Z, 0-9, _ — ใช้ใน template เป็น <code>&#123;item_key&#125;</code></div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">SQL Query *</label>
+                  <textarea class="form-control" name="sql_query" rows="6" required style="font-family:ui-monospace,monospace;font-size:13px;"></textarea>
+                  <div class="form-text">ใช้ <code>&#123;date&#125;</code> สำหรับวันที่ปัจจุบัน (YYYY-MM-DD)</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Database</label>
+                  <select class="form-select" name="his_database" id="hisDatabaseSelect">
+                    <option value="__app__">📊 ฐานข้อมูลโปรเจ็ค</option>
+                    @each(db in hisDbs)
+                      <option value="{{ db.name }}">{{ db.label }}</option>
+                    @end
+                  </select>
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label">รายละเอียด</label>
+                  <input type="text" class="form-control" name="description">
+                </div>
+                <div class="col-12">
+                  <label class="form-switch-modern">
+                    <input type="checkbox" name="is_active" value="1" checked>
+                    <span class="switch-track"></span>
+                    <span>เปิดใช้งาน</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button type="button" class="btn-modern btn-soft" data-bs-dismiss="modal">ยกเลิก</button>
+              <button type="submit" class="btn-modern btn-brand"><i class="bi bi-check-lg"></i> บันทึก</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  @end
+
+  @slot('scripts')
+    <script>
+      (function () {
+        const Items = {
+          modal: null,
+          init() {
+            this.modal = new bootstrap.Modal(document.getElementById('itemModal'));
+            document.getElementById('itemForm').addEventListener('submit', e => {
+              e.preventDefault();
+              this.save();
+            });
+          },
+          openNew() {
+            const f = document.getElementById('itemForm');
+            f.reset();
+            f.id.value = '';
+            f.is_active.checked = true;
+            document.getElementById('itemModalTitle').textContent = 'เพิ่มรายการ';
+            this.modal.show();
+          },
+          openEdit(i) {
+            const f = document.getElementById('itemForm');
+            f.id.value = i.id;
+            f.item_name.value = i.name;
+            f.item_key.value = i.key;
+            f.sql_query.value = i.sql;
+            f.his_database.value = i.his || '__app__';
+            f.description.value = i.description || '';
+            f.is_active.checked = !!i.is_active;
+            document.getElementById('itemModalTitle').textContent = 'แก้ไขรายการ';
+            this.modal.show();
+          },
+          async save() {
+            const fd = new FormData(document.getElementById('itemForm'));
+            const res = await App.ajax('/items/save', fd);
+            if (res.success) {
+              App.success('สำเร็จ', res.message);
+              this.modal.hide();
+              setTimeout(() => location.reload(), 500);
+            }
+          },
+          async remove(id) {
+            const ok = await App.confirm({ title: 'ลบรายการ?', text: 'ไม่สามารถย้อนกลับได้', confirmText: 'ลบ', danger: true });
+            if (!ok) return;
+            const res = await App.ajax('/items/delete', { id });
+            if (res.success) {
+              App.success('สำเร็จ', res.message);
+              document.querySelector(`tr[data-item-id="${id}"]`)?.remove();
+            }
+          },
+          async test(id) {
+            const res = await App.ajax('/items/test', { id });
+            if (res.success) {
+              document.getElementById('outputModalTitle').innerHTML = '<i class="bi bi-database"></i> ผลการทดสอบ Query';
+              document.getElementById('outputModalContent').textContent = JSON.stringify(res.data?.result ?? {}, null, 2);
+              new bootstrap.Modal(document.getElementById('outputModal')).show();
+            }
+          },
+        };
+        window.Items = Items;
+        document.addEventListener('DOMContentLoaded', () => Items.init());
+      })();
+    </script>
+  @end
+@end
