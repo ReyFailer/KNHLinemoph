@@ -70,12 +70,12 @@ node ace generate:key
 
 ## Login เริ่มต้น
 
-ใช้ข้อมูลผู้ใช้เดิมจากตาราง `users` ใน DB — bcrypt `$2y$` จาก PHP อ่านได้ตรงๆ ไม่ต้องตั้งรหัสใหม่
+```
+username : admin
+password : 123456
+```
 
-```
-ID 1 : admin  (role: admin)
-ID 2 : knh    (role: admin)
-```
+> เปลี่ยนรหัสผ่านหลัง deploy ครั้งแรก
 
 ---
 

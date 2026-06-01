@@ -177,8 +177,8 @@ INSERT INTO `system_settings` (`setting_key`, `setting_value`, `updated_by`) VAL
 
 -- ============================================================
 -- Seed — default admin user
--- password = "admin"  (bcrypt $2b$10$, compat กับ bcryptjs)
+-- password = "123456"  (bcrypt $2b$10$, compat กับ bcryptjs)
 -- เปลี่ยนรหัสผ่านหลัง deploy ครั้งแรก
 -- ============================================================
 INSERT INTO `users` (`username`, `display_name`, `password_hash`, `role`, `is_active`) VALUES
-  ('admin', 'Administrator', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 1);
+  ('admin', 'Administrator', '$2b$10$wGfB0/OHU0uoKuXbhRLlA.SzQl/SMfG1xUd/tiW/5ygah8fVmUrT.', 'admin', 1);
