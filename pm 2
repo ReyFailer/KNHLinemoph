@@ -1,4 +1,0 @@
-npm install -g pm2
-pm2 start "node bin/server.js" --name line-notify
-pm2 startup
-pm2 save
