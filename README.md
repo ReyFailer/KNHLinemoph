@@ -1,187 +1,136 @@
-# ระบบ LINE Notification (AdonisJS Edition)
+# KNHLinemoph — ระบบแจ้งเตือน LINE
 
-Rewrite ของ [line-notify-system](../line-notify-system) (PHP) เป็น **AdonisJS v6** (TypeScript, ESM) + **Edge.js** views + **Lucid ORM** บนสคีมา MySQL เดิม
+ระบบส่งข้อความแจ้งเตือนอัตโนมัติผ่าน LINE สำหรับโรงพยาบาล พัฒนาด้วย **AdonisJS v6** (TypeScript) บนฐานข้อมูล MySQL เดิม
 
 ---
 
 ## Stack
 
-- **AdonisJS v6** (`@adonisjs/core` 6.18) — HTTP server, DI, env validator
-- **Edge.js** 6 — server-rendered views
-- **Lucid ORM** 21 (mysql2) — APP database
-- **mysql2 pools** — HIS database connections (UI-managed via `his_databases`)
-- **@adonisjs/auth** session guard + **bcryptjs** (compat กับ `$2y$` hashes จาก PHP)
-- **@adonisjs/shield** CSRF
-- **@adonisjs/session** cookie store
-- **@vinejs/vine** validation
-- **node-cron** in-process scheduler
-- **Bootstrap 5.3** + custom theme.css (port จาก PHP)
+| ชั้น | เทคโนโลยี |
+|------|-----------|
+| Framework | AdonisJS v6 + TypeScript (ESM) |
+| View | Edge.js 6 (server-rendered) |
+| ORM | Lucid 21 + mysql2 (APP DB) |
+| HIS DB | mysql2 connection pools (UI-managed) |
+| Auth | @adonisjs/auth session guard + bcryptjs |
+| Scheduler | node-cron (in-process) |
+| Frontend | Bootstrap 5.3 |
 
 ---
 
-## โครงสร้าง
-
-```
-app/
-  controllers/      # 12 controllers (auth, dashboard, schedules, templates, items,
-                    #                  groups, logs, audit, users, settings, hisdb, cron, health)
-  models/           # 9 Lucid models map ตารางเดิม 1:1
-  services/         # cron, notification, line_api, his_manager, schedule_calculator,
-                    # audit, settings
-  middleware/       # auth, role, guest, share_view_globals, container_bindings
-  validators/       # VineJS schemas ต่อ action
-  exceptions/       # global handler (404/500/503)
-  commands/         # node ace cron:run
-config/             # app, auth, database, session, shield, hash, static, logger, bodyparser
-providers/          # his_provider, scheduler_provider
-resources/views/    # layouts (app, auth) + partials (sidebar, topbar, modals, flash)
-                    # + pages (10 หน้า) + errors (404, 500, 503)
-public/assets/      # theme.css, app.js, schedules.js (verbatim port จาก PHP)
-start/              # env, kernel, routes, view
-database/           # migrations (เปล่า — เก็บ schema เดิม)
-logs/               # cron log per day (cron_YYYY-MM-DD.log)
-backups/            # auto SQL backup ที่ 23:xx ทุกวัน
-```
-
----
-
-## Setup
+## ติดตั้ง
 
 ```powershell
-cd c:\xampp\htdocs\noncenter\line-notify-adonis
+cd c:\xampp\htdocs\noncenter\KNHLinemoph
 npm install
 copy .env.example .env
-notepad .env       # ใส่ APP_DB_* + HIS_DB_* + CRON_TOKEN
-node ace generate:key   # ถ้า APP_KEY ยังว่าง
+```
+
+แก้ไขค่าใน `.env`:
+
+```env
+# APP database
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=...
+DB_PASSWORD=...
+DB_DATABASE=line_notify_system
+
+# HIS database (fallback)
+HIS_DB_HOST=...
+HIS_DB_USER=...
+HIS_DB_PASSWORD=...
+HIS_DB_DATABASE=hos
+HIS_DB_CHARSET=tis620
+
+# ต้องตั้ง
+CRON_TOKEN=...          # token สำหรับ POST /cron/run
+MAX_LOG_DAYS=30
+```
+
+สร้าง APP_KEY (ถ้ายังว่าง):
+```powershell
+node ace generate:key
 ```
 
 ---
 
-## รัน
+## คำสั่งที่ใช้บ่อย
 
 | คำสั่ง | ทำอะไร |
 |--------|--------|
 | `npm run dev` | dev server + HMR ที่ `http://localhost:3333` |
-| `npm start` | production server (ต้อง `npm run build` ก่อน) |
-| `npm run build` | compile TS → `build/` สำหรับ deploy |
-| `npm run typecheck` | tsc --noEmit |
-| `npm run cron:run` | รัน cron pipeline 1 รอบ (manual / OS scheduler) |
+| `npm run build` | compile TS → `build/` |
+| `npm start` | production server (ต้อง build ก่อน) |
+| `npm run typecheck` | ตรวจ TypeScript |
+| `npm run cron:run` | รัน cron pipeline 1 รอบ (manual) |
 | `node ace list` | ดู ace commands ทั้งหมด |
-
-### Login เริ่มต้น
-
-ใช้ user เดิมจากระบบ PHP — `users` table ใน DB `line_notify_system`
-
-```
-ID 1: admin     (admin)
-ID 2: knh       (admin)
-```
-
-bcrypt `$2y$` hashes จาก PHP **อ่านได้ตรงๆ** ด้วย bcryptjs ใน Node — ไม่ต้องตั้งรหัสใหม่
 
 ---
 
-## Cron — 3 ทาง
+## Login เริ่มต้น
 
-### 1. In-process scheduler (ค่า default)
+ใช้ข้อมูลผู้ใช้เดิมจากตาราง `users` ใน DB — bcrypt `$2y$` จาก PHP อ่านได้ตรงๆ ไม่ต้องตั้งรหัสใหม่
 
-`npm run dev` หรือ `npm start` → SchedulerProvider boot node-cron tick ทุกนาที (TZ=Asia/Bangkok)
-
-ดูจาก log:
 ```
-SchedulerProvider: in-process cron tick started (every minute, TZ=Asia/Bangkok)
+ID 1 : admin  (role: admin)
+ID 2 : knh    (role: admin)
 ```
 
-### 2. CLI (OS scheduler)
+---
 
-ถ้าไม่อยากให้ server-process รัน scheduler ให้ external scheduler เป็นคน trigger:
+## Cron — 3 วิธีเรียก
 
+### 1. In-process (default)
+`npm run dev` / `npm start` จะ boot SchedulerProvider → node-cron tick ทุกนาที (TZ=Asia/Bangkok)
+
+### 2. CLI / OS Scheduler
 ```powershell
-# Windows Task Scheduler: ทุก 1 นาที
-node ace cron:run
-
-# หรือใช้ npm script
 npm run cron:run
+# หรือ: node ace cron:run
 ```
 
-### 3. HTTP token (uptime monitor)
-
+### 3. HTTP Token
 ```
 POST http://localhost:3333/cron/run?token=YOUR_CRON_TOKEN
 ```
-
-ต้องตรงกับ `CRON_TOKEN` ใน `.env` — exempted จาก CSRF + auth gate (controller ตรวจ token เอง)
-
----
-
-## ปรับปรุงจากระบบเดิม (PHP)
-
-| # | จุดเดิม | ระบบใหม่ |
-|---|---------|-----------|
-| 1 | URL `?page=schedules&action=save` | RESTful: `POST /schedules/save` |
-| 2 | mysqli raw error เป็น `false` | Lucid ORM + Exception throw + Pino logger |
-| 3 | Validation กระจาย ในแต่ละ handler | VineJS schema ต่อ action ที่ boundary |
-| 4 | JSON columns encode/decode ด้วยมือ | Lucid `prepare/consume` casting |
-| 5 | Cron 3 กลไก (CLI + web token + browser auto-tick) | node-cron in-process + CLI + token endpoint (เอา browser auto-tick ออก) |
-| 6 | bcrypt $2y$ จาก PHP | bcryptjs (อ่าน $2y$ ได้) |
-| 7 | HIS = mysqli single connection | mysql2 connection **pool** ต่อ name |
-| 8 | session = PHP $_SESSION | @adonisjs/session + regenerate on login |
-| 9 | Env กระจาย | Adonis env validator (strict, type-checked) |
-| 10 | Error page เป็น include PHP | 404/500/503 templates ตาม Adonis exception handler |
+Exempt จาก CSRF + auth — ใช้กับ uptime monitor หรือ external trigger
 
 ---
 
-## Smoke test
+## Roles
 
-```powershell
-# 1. Health check
-curl http://localhost:3333/health
-# → {"ok":true,"checks":{"app":true,"time":"...","app_db":true}}
+| Role | สิทธิ์ |
+|------|--------|
+| `viewer` | ดูข้อมูลอย่างเดียว |
+| `operator` | CRUD schedules/templates/items + รัน cron |
+| `admin` | ทุกอย่าง + จัดการ users/groups/settings |
 
-# 2. Login flow ผ่าน browser
-# http://localhost:3333/login → admin / <รหัสจาก PHP เดิม>
+---
 
-# 3. ทดสอบ schedule
-# /schedules → กดทดสอบ schedule ที่มี → ดูข้อความใน LINE
+## Health Check
 
-# 4. ทดสอบ HIS query
-# /items → กด ▶ ที่ item ใดๆ → ดูผล query
-
-# 5. ทดสอบ cron
-node ace cron:run
-# → log ออก step ทั้ง 8 ขั้นใน console + ใน logs/cron_YYYY-MM-DD.log
+```
+GET /health
+→ {"ok":true,"checks":{"app":true,"app_db":true,...}}
 ```
 
 ---
 
-## Production deploy
+## Production Deploy
 
 ```powershell
-# 1. Build
 npm run build
-
-# 2. Set NODE_ENV
 $env:NODE_ENV = "production"
-
-# 3. Run
 node bin/server.js
+```
 
-# หรือใช้ pm2:
+หรือใช้ PM2:
+```powershell
 npm i -g pm2
-pm2 start npm --name line-notify -- start
+pm2 start "node bin/server.js" --name KNHLinemoph
 pm2 save
 pm2 startup
-```
-
-ถ้าอยู่หลัง Apache (XAMPP) ใช้ reverse proxy:
-
-```apache
-# httpd-vhosts.conf
-<VirtualHost *:80>
-  ServerName line-notify.local
-  ProxyPass / http://localhost:3333/
-  ProxyPassReverse / http://localhost:3333/
-</VirtualHost>
 ```
 
 ---
